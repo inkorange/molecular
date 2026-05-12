@@ -28,7 +28,7 @@ interface ElectronPlan {
 
 const NUCLEUS_RADIUS = 0.2
 const SHELL_RADIUS_BASE = 0.32
-const SHELL_RADIUS_STEP = 0.16
+const SHELL_RADIUS_STEP = 0.09
 const MAX_ELECTRONS_VISIBLE = 8
 // Each electron renders as a trailing arc of sprites to give the impression
 // of speed + motion blur. TRAIL_LENGTH includes the head sprite at full opacity.
