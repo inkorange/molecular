@@ -55,8 +55,8 @@ export function Atom({ Z, position, showLabel = true, scale = 1, opacity = 1 }: 
         const tiltZDeg = ((globalIdx * 73 + 31) % 180) - 90
         const phaseOffset = (((globalIdx * 137) % 360) * Math.PI) / 180
         const direction = globalIdx % 2 === 0 ? 1 : -1
-        // Speeds range ~5..11 rad/s, signed.
-        const speed = (5 + ((globalIdx * 13) % 60) / 10) * direction
+        // Speeds range ~14..24 rad/s, signed — ~3+ revolutions per second.
+        const speed = (14 + ((globalIdx * 13) % 100) / 10) * direction
         plans.push({
           id: `e-${globalIdx}`,
           radius,
