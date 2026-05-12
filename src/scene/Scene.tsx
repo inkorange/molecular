@@ -28,7 +28,7 @@ export function Scene({ children, enableBloom = true }: SceneProps) {
       <Stars radius={50} depth={50} count={3000} factor={4} fade speed={1} />
       <OrbitControls
         makeDefault
-        enablePan
+        enablePan={false}
         enableRotate
         enableZoom
         minDistance={2}
