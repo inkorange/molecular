@@ -11,10 +11,10 @@ interface BondProps {
   type?: 'covalent' | 'ionic'
 }
 
-const RADIUS = 0.06
-const GAP = 0.08
+const RADIUS = 0.045
+const GAP = 0.07
 
-export function Bond({ start, end, order, color = '#bfeaff', type = 'covalent' }: BondProps) {
+export function Bond({ start, end, order, color = '#3d5a78', type = 'covalent' }: BondProps) {
   const { center, length, quaternion, perpendicular } = useMemo(() => {
     const s = new Vector3(...start)
     const e = new Vector3(...end)
@@ -68,8 +68,9 @@ export function Bond({ start, end, order, color = '#bfeaff', type = 'covalent' }
           <meshStandardMaterial
             color={color}
             emissive={color}
-            emissiveIntensity={0.6}
-            roughness={0.4}
+            emissiveIntensity={0.4}
+            roughness={0.35}
+            metalness={0.4}
           />
         </mesh>
       ))}

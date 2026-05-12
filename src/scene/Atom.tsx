@@ -1,9 +1,17 @@
 'use client'
 
-import { Billboard, Line, Text } from '@react-three/drei'
+import { Billboard, Text } from '@react-three/drei'
 import { useFrame } from '@react-three/fiber'
-import { useMemo, useRef } from 'react'
-import { AdditiveBlending, type Group, type Vector3Tuple } from 'three'
+import { useEffect, useMemo, useRef } from 'react'
+import {
+  AdditiveBlending,
+  BufferGeometry,
+  Float32BufferAttribute,
+  type Group,
+  LineBasicMaterial,
+  Line as ThreeLine,
+  type Vector3Tuple,
+} from 'three'
 import { getElement } from '@/src/chem/elements'
 import { ElectronSprite } from './ElectronSprite'
 
@@ -30,10 +38,39 @@ const NUCLEUS_RADIUS = 0.2
 const SHELL_RADIUS_BASE = 0.32
 const SHELL_RADIUS_STEP = 0.09
 const MAX_ELECTRONS_VISIBLE = 8
-// The tail is drawn as a single continuous Line — TAIL_POINTS samples along the arc.
-// More points = smoother curve. 32 keeps it cheap and visually smooth at scene scale.
+// The tail is drawn as a single continuous THREE.Line — TAIL_POINTS samples along the arc.
 const TAIL_POINTS = 32
 const TAIL_ARC = Math.PI / 3 // 60° behind the head
+
+function buildTrailLine(plan: ElectronPlan): ThreeLine {
+  const trailDir = plan.speed >= 0 ? 1 : -1
+  const positions = new Float32Array(TAIL_POINTS * 3)
+  const colors = new Float32Array(TAIL_POINTS * 3)
+  for (let k = 0; k < TAIL_POINTS; k++) {
+    const angle = trailDir * (k / (TAIL_POINTS - 1)) * TAIL_ARC
+    positions[k * 3] = Math.cos(angle) * plan.radius
+    positions[k * 3 + 1] = 0
+    positions[k * 3 + 2] = Math.sin(angle) * plan.radius
+    // Brightness fades from head (~0.7) to tail (~0). Stored as RGB; additive
+    // blending below means "near-black" rows contribute nothing to the framebuffer
+    // — so the tail effectively vanishes over both atoms and the space background.
+    const fade = 1 - k / (TAIL_POINTS - 1)
+    const intensity = 0.7 * fade ** 1.4
+    colors[k * 3] = intensity
+    colors[k * 3 + 1] = intensity * 0.92
+    colors[k * 3 + 2] = intensity * 0.55
+  }
+  const geom = new BufferGeometry()
+  geom.setAttribute('position', new Float32BufferAttribute(positions, 3))
+  geom.setAttribute('color', new Float32BufferAttribute(colors, 3))
+  const mat = new LineBasicMaterial({
+    vertexColors: true,
+    transparent: true,
+    depthWrite: false,
+    blending: AdditiveBlending,
+  })
+  return new ThreeLine(geom, mat)
+}
 
 export function Atom({ Z, position, showLabel = true, scale = 1, opacity = 1 }: AtomProps) {
   const el = getElement(Z)
@@ -49,8 +86,6 @@ export function Atom({ Z, position, showLabel = true, scale = 1, opacity = 1 }: 
       const radius = SHELL_RADIUS_BASE + shellIdx * SHELL_RADIUS_STEP
       const isValence = shellIdx === el.shells.length - 1
       for (let i = 0; i < electronsInShell; i++) {
-        // Deterministic per-electron variation via prime-product hashing:
-        // each electron gets its own tilt, starting phase, and signed speed.
         const tiltXDeg = ((globalIdx * 47 + 17) % 180) - 90
         const tiltZDeg = ((globalIdx * 73 + 31) % 180) - 90
         const phaseOffset = (((globalIdx * 137) % 360) * Math.PI) / 180
@@ -71,6 +106,23 @@ export function Atom({ Z, position, showLabel = true, scale = 1, opacity = 1 }: 
     return plans
   }, [el.shells])
 
+  // Build one THREE.Line per electron up front so we don't re-allocate on every render.
+  const trailLines = useMemo(() => electronPlans.map((p) => buildTrailLine(p)), [electronPlans])
+
+  // Dispose geometries and materials when this Atom unmounts.
+  useEffect(() => {
+    return () => {
+      for (const line of trailLines) {
+        line.geometry.dispose()
+        if (Array.isArray(line.material)) {
+          for (const m of line.material) m.dispose()
+        } else {
+          line.material.dispose()
+        }
+      }
+    }
+  }, [trailLines])
+
   useFrame((_, delta) => {
     for (let i = 0; i < electronRefs.current.length; i++) {
       const ref = electronRefs.current[i]
@@ -89,8 +141,8 @@ export function Atom({ Z, position, showLabel = true, scale = 1, opacity = 1 }: 
           color={el.cpkColor}
           emissive={el.cpkColor}
           emissiveIntensity={0.4}
-          roughness={0.35}
-          metalness={0.1}
+          roughness={0.28}
+          metalness={0.35}
           transparent={opacity < 1}
           opacity={opacity}
         />
@@ -112,32 +164,14 @@ export function Atom({ Z, position, showLabel = true, scale = 1, opacity = 1 }: 
         </Billboard>
       )}
 
-      {/* Per-electron orbits: each electron has its own group with its own tilt,
-          starting phase, and signed rotation speed. The trail is a single Line
-          with per-vertex alpha — guarantees a smooth continuous streak with no
-          visible "string of beads" artifact. The head is one bright sprite. */}
+      {/* Per-electron orbits: each electron has its own tilted group with a
+          pre-built THREE.Line trail (additive-blended, so the tail glows over
+          dark and disappears over bright). The head is a single bright sprite. */}
       {electronPlans.map((plan, idx) => {
-        const headScale = plan.isValence ? 0.04 : 0.03
+        const headScale = plan.isValence ? 0.06 : 0.045
         const colorHex = plan.isValence ? '#fff5b8' : '#ffd97a'
         const headPos: Vector3Tuple = [plan.radius, 0, 0]
-
-        // Sample TAIL_POINTS positions along the arc behind the head.
-        // Rotation around Y by +δ moves points from +X toward -Z, so a trail
-        // BEHIND the moving head sits at +Z (positive angles) for positive-speed
-        // electrons, and at -Z (negative angles) for reverse-rotating ones.
-        const trailDir = plan.speed >= 0 ? 1 : -1
-        const tailPoints: Vector3Tuple[] = []
-        const tailColors: Array<[number, number, number]> = []
-        for (let k = 0; k < TAIL_POINTS; k++) {
-          const angle = trailDir * (k / (TAIL_POINTS - 1)) * TAIL_ARC
-          tailPoints.push([Math.cos(angle) * plan.radius, 0, Math.sin(angle) * plan.radius])
-          // Color fades from bright at the head to near-black at the tail.
-          // With additive blending below, near-black contributes nothing — so the
-          // tail effectively becomes "transparent" over both the atom and space.
-          const fade = 1 - k / (TAIL_POINTS - 1)
-          const intensity = 0.7 * fade ** 1.4
-          tailColors.push([intensity, intensity * 0.92, intensity * 0.55])
-        }
+        const trailLine = trailLines[idx]
 
         return (
           <group key={plan.id} rotation={plan.tilt}>
@@ -149,20 +183,7 @@ export function Atom({ Z, position, showLabel = true, scale = 1, opacity = 1 }: 
                 }
               }}
             >
-              {/* The trail line — continuous, no dot artifacts.
-                  Additive blending makes the line glow over dark backgrounds
-                  and disappear over bright ones (rather than rendering as dark
-                  hairlines over the atom). */}
-              <Line
-                points={tailPoints}
-                vertexColors={tailColors}
-                lineWidth={2.2}
-                transparent
-                opacity={1}
-                material-blending={AdditiveBlending}
-                material-depthWrite={false}
-              />
-              {/* The head — a single bright sprite at the leading position. */}
+              {trailLine && <primitive object={trailLine} />}
               <ElectronSprite
                 position={headPos}
                 scale={headScale}

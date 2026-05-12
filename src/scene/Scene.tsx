@@ -1,6 +1,6 @@
 'use client'
 
-import { OrbitControls, Stars } from '@react-three/drei'
+import { Environment, OrbitControls, Stars } from '@react-three/drei'
 import { Canvas } from '@react-three/fiber'
 import { Bloom, EffectComposer } from '@react-three/postprocessing'
 import type { ReactNode } from 'react'
@@ -22,6 +22,9 @@ export function Scene({ children, enableBloom = true }: SceneProps) {
     >
       <ambientLight intensity={0.3} />
       <directionalLight position={[5, 5, 5]} intensity={0.7} />
+      {/* Subtle environment map — adds reflections to any metalness>0 material
+          without rendering a visible skybox. ~256KB one-time load, ~free per frame. */}
+      <Environment preset="night" background={false} environmentIntensity={0.45} />
       <Stars radius={50} depth={50} count={3000} factor={4} fade speed={1} />
       <OrbitControls
         enablePan
