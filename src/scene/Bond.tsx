@@ -46,7 +46,7 @@ export function Bond({ start, end, order, color = '#bfeaff', type = 'covalent' }
   if (type === 'ionic') {
     return (
       <mesh position={center} quaternion={quaternion}>
-        <cylinderGeometry args={[RADIUS * 0.5, RADIUS * 0.5, length, 8]} />
+        <cylinderGeometry args={[RADIUS * 0.5, RADIUS * 0.5, length, 24]} />
         <meshBasicMaterial color="#a4ff8c" transparent opacity={0.35} />
       </mesh>
     )
@@ -64,7 +64,7 @@ export function Bond({ start, end, order, color = '#bfeaff', type = 'covalent' }
           ]}
           quaternion={quaternion}
         >
-          <cylinderGeometry args={[RADIUS, RADIUS, length, 12]} />
+          <cylinderGeometry args={[RADIUS, RADIUS, length, 32]} />
           <meshStandardMaterial
             color={color}
             emissive={color}

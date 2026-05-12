@@ -129,10 +129,12 @@ export function Atom({ Z, position, showLabel = true, scale = 1, opacity = 1 }: 
               0,
               Math.sin(angle) * plan.radius,
             ] as Vector3Tuple,
-            // Comet taper: head at full size, tail shrinks to ~15% the head size.
-            scale: baseScale * (0.15 + 0.85 * fade),
-            // Bright head (~0.85) fades smoothly to near zero at the end of the tail.
-            opacity: 0.85 * fade ** 2,
+            // Comet taper: head at full size, tail shrinks to ~10% of the head size.
+            scale: baseScale * (0.1 + 0.9 * fade ** 1.5),
+            // The head blooms (0.85). Trail sprites are kept low enough that even
+            // with additive blending their accumulated brightness stays below the
+            // bloom threshold — so the tail reads as a faint streak, not glow.
+            opacity: k === 0 ? 0.85 : 0.025 * fade ** 0.5,
           }
         })
         return (
