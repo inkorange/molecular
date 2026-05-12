@@ -1,12 +1,17 @@
 'use client'
 
 import type { ThreeEvent } from '@react-three/fiber'
-import { type RapierRigidBody, RigidBody } from '@react-three/rapier'
+import { BallCollider, type RapierRigidBody, RigidBody } from '@react-three/rapier'
 import { useMemo, useRef } from 'react'
 import type { Atom as AtomData, Bond as BondData } from '@/src/chem/types'
 import { usePointerToWorld } from '@/src/lib/usePointerToWorld'
 import { Atom } from './Atom'
 import { Bond } from './Bond'
+
+// Collider radius around each atom nucleus. The visible nucleus is ~0.2 in
+// Atom.tsx; the collider is slightly larger so molecules contact when their
+// electron shells (not just nuclei) overlap.
+const ATOM_COLLIDER_RADIUS = 0.32
 
 interface LabMoleculeProps {
   moleculeId: string
@@ -163,7 +168,11 @@ export function LabMolecule({ moleculeId, atoms, bonds, onCollideWith }: LabMole
     <RigidBody
       ref={bodyRef}
       position={centroid}
-      colliders="ball"
+      // Explicit colliders below — relying on `colliders="ball"` would auto-
+      // generate ball colliders from EVERY child mesh (label cards, electron
+      // sprites, trails, …) producing oversized/incorrect bounding spheres
+      // that pushed atoms off-screen.
+      colliders={false}
       linearDamping={LINEAR_DAMPING}
       angularDamping={LINEAR_DAMPING}
       userData={{ moleculeId }}
@@ -173,6 +182,11 @@ export function LabMolecule({ moleculeId, atoms, bonds, onCollideWith }: LabMole
         if (otherId && otherId !== moleculeId) onCollideWith(otherId)
       }}
     >
+      {/* One ball collider per atom nucleus, positioned at the atom's
+          local offset from the molecule centroid. */}
+      {localAtoms.map((a) => (
+        <BallCollider key={`c-${a.id}`} args={[ATOM_COLLIDER_RADIUS]} position={a.localPos} />
+      ))}
       {/* Wrapper group catches pointer events for the whole molecule so the
           user can grab any atom to drag the body. Atom's own pointer handlers
           are gated by `inBuild` and early-return without stopping propagation
