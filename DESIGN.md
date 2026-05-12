@@ -18,11 +18,12 @@
 
 **Success criteria for v1:**
 
-1. A student can drop atoms in the scene and **build water, methane, salt, and carbon dioxide** in under 2 minutes, with no prior instruction.
-2. A student can **search "glucose" in the molecule library** and instantly see C₆H₁₂O₆ rotating in 3D, with its formula, common name, and a "tell me about this molecule" button.
-3. A student can **throw two H₂ at one O₂** in Lab mode and watch them react into 2 H₂O — with electron transfer/sharing visualized.
-4. The **AI tutor** can answer "why did this happen?" given the current scene state.
-5. Runs at 60 fps on a 2020 MacBook Air at full window; gracefully degrades on tablets and phones.
+1. A first-time visitor lands on the **homepage** and watches at least one full reaction cycle in the background before clicking through to the app.
+2. A student can drop atoms in the scene and **build water, methane, salt, and carbon dioxide** in under 2 minutes, with no prior instruction.
+3. A student can **search "glucose" in the molecule library** and instantly see C₆H₁₂O₆ rotating in 3D, with its formula, common name, and a "tell me about this molecule" button.
+4. A student can **throw two H₂ at one O₂** in Lab mode and watch them react into 2 H₂O — with electron transfer/sharing visualized.
+5. The **AI tutor** can answer "why did this happen?" given the current scene state.
+6. Runs at 60 fps on a 2020 MacBook Air at full window; gracefully degrades on tablets and phones. Homepage hero hits TTI ≤ 1.5 s on Fast 4G.
 
 ---
 
@@ -43,6 +44,37 @@ The left sidebar switches to the **Periodic Table palette** (see §7). User drag
 ### C. Lab
 
 Same scene as Build, but physics enabled (lazy-loaded `@react-three/rapier`). Toolbar lets the user select an atom or molecule, then **fling** it (click-drag direction + force; a vector arrow shows the trajectory). On collision, the chemistry engine checks: does this match a known reaction? If yes, animate the transformation — electrons visibly transfer (ionic) or share (covalent), old bonds dissolve, new bonds glow into place. If no match, atoms bond per valence rules if energy + geometry allow, otherwise bounce. A **Reaction Log** panel records what happened ("2 H₂ + O₂ → 2 H₂O · synthesis · ΔH released").
+
+### D. Landing page (homepage, route `/`)
+
+The first thing a visitor sees, and a ship-blocker for v1. A fullscreen R3F canvas plays an **autonomous reaction reel** in the background — one molecule at a time, anchored off-center to the right so it doesn't compete with the hero copy on the left.
+
+**The reel** (~8 s per cycle, then loops cleanly):
+
+1. **Water (H₂O)** — O drifts in from offscreen; 2 H follow from opposite sides; valence sites pulse; H atoms snap; covalent bonds form with the electron-pair animation; water rotates serenely; fade.
+2. **Methane (CH₄)** — C arrives at center; 4 H come in from tetrahedral directions; snap simultaneously; the 109.5° tetrahedron resolves; fade.
+3. **Ammonia (NH₃)** — N arrives; 3 H bond; pyramidal shape settles; lone pair shown as a faint paired-electron cluster; fade.
+4. **Salt (NaCl)** — Na and Cl approach; the **ionic transfer animation** plays — a single electron literally jumps from Na to Cl, leaving Na⁺ and Cl⁻; the ions sit electrostatically close with a dotted line between them; fade.
+5. Loop.
+
+**Foreground content (above the fold):** product wordmark + slim top nav (About / Library / Lab), hero title ("Build the periodic table in 3D."), tagline, two CTAs ("Open the Lab →" routes to `/app`; "Browse molecules" routes to `/app?mode=explore`), and a scroll hint.
+
+**Below the fold:** three feature cards (Explore / Build / Lab), each with its own small live R3F preview canvas demonstrating that mode; a 3-step "How it works" strip (pick an atom → snap bonds → see the chemistry); a footer with GitHub link and credits.
+
+**Reusability.** The reel uses the same `<Atom>`, `<Bond>`, and `<ReactionAnimator>` components as the app. A thin `<HomepageReel>` orchestrator schedules each cycle, tweens incoming atoms from offscreen positions, and emits the bond-formation events the existing components already handle.
+
+**Interactivity in the background:**
+
+- Clicking the central molecule jumps the user to Explore mode at `/app` with that exact molecule preloaded.
+- Hovering pauses the reel (so it doesn't fade away mid-read).
+- Cursor movement adds subtle parallax to the starfield.
+
+**Performance budget:** TTI ≤ 1.5 s on Fast 4G. First paint shows the foreground text + a static starfield placeholder; the canvas hydrates after, and the reel starts on a one-frame delay.
+
+**Reduced-motion / mobile fallback:**
+
+- `prefers-reduced-motion` — render only the rest state (a single hand-arranged water molecule), no incoming atoms, no shock-burst, electron orbits frozen.
+- Mobile — same fallback by default; cycle still runs but at a slower cadence (~12 s) with no bloom.
 
 ### Cross-cutting features (all modes)
 
@@ -444,7 +476,8 @@ No backend. No accounts. v2 adds: optional Supabase auth, server-side gallery, t
 
 - 60 fps on a 2020 MacBook Air, full window, ~20 atoms in view
 - 30 fps minimum on iPad mini and mid-range Android phones
-- < 200 ms time-to-interactive after route load on a Fast 4G connection
+- < 200 ms time-to-interactive after route load on a Fast 4G connection (app route)
+- Homepage hero — TTI ≤ 1.5 s on Fast 4G; static starfield + foreground render first, canvas hydrates after, reel starts on the next frame
 
 ### Levers
 
@@ -470,7 +503,8 @@ No backend. No accounts. v2 adds: optional Supabase auth, server-side gallery, t
 molecular/
 ├─ app/
 │  ├─ layout.tsx              # Root: Tailwind, theme, providers
-│  ├─ page.tsx                # The app shell
+│  ├─ page.tsx                # Landing page (hero + reel + feature cards + footer)
+│  ├─ app/page.tsx            # Interactive app: <Scene/> + <Sidebar/> + <Inspector/>
 │  ├─ api/tutor/route.ts      # AI tutor streaming endpoint
 │  ├─ s/[hash]/page.tsx       # Shared scene loader (URL hash route)
 │  └─ globals.css
@@ -509,6 +543,13 @@ molecular/
 │  │  ├─ ModeSwitcher.tsx
 │  │  ├─ ValidityBar.tsx
 │  │  └─ TutorPanel.tsx
+│  ├─ landing/                # Homepage-only components
+│  │  ├─ HomepageReel.tsx     # Orchestrates the autonomous reaction cycle
+│  │  ├─ ReelMolecule.tsx     # Wraps <Molecule> with tween-in/tween-out behavior
+│  │  ├─ HeroCopy.tsx         # Title, tagline, CTAs
+│  │  ├─ FeatureCards.tsx     # Explore / Build / Lab with mini live previews
+│  │  ├─ HowItWorks.tsx       # 3-step strip
+│  │  └─ Footer.tsx
 │  ├─ hooks/                  # useDrag, useScene, useTutorStream, useShareUrl
 │  └─ lib/
 │     ├─ shareUrl.ts          # encode / decode scene → URL hash
@@ -518,7 +559,7 @@ molecular/
 ├─ tests/
 │  ├─ chem/                   # rules.spec, reactions.spec, validate.spec, vsper.spec
 │  ├─ store/                  # store mutation tests
-│  └─ e2e/                    # Playwright: build water, react H2+O2, share-link roundtrip
+│  └─ e2e/                    # Playwright: landing-page, build water, react H2+O2, share-link roundtrip
 ├─ vercel.ts                  # framework: nextjs, AI Gateway env binding
 ├─ next.config.ts
 ├─ tailwind.config.ts
@@ -567,11 +608,12 @@ The chemistry engine is pure TypeScript and gets the bulk of the unit coverage:
 
 ### End-to-end (Playwright)
 
-1. **Build water** — drag O onto scene, drag H, snap to first valence site, drag second H, snap to second site → validity bar reads "✓ Water"
-2. **Library spawn** — search "glucose" → click → scene contains 24 atoms (C₆H₁₂O₆), inspector shows formula and uses
-3. **Lab reaction** — switch to Lab mode, spawn 2 H₂ and 1 O₂, fling H₂ at O₂ → after collision, scene contains 2 H₂O, reaction log shows the equation
-4. **Share roundtrip** — build methane, click Share, open returned URL in a fresh context → scene loads with identical atoms/bonds
-5. **AI tutor** — in Explore mode with water spawned, click "Tell me about this molecule" → streaming response references "two hydrogen atoms bonded to oxygen"
+1. **Landing page** — `/` renders hero copy + canvas; reel starts within 2 s; clicking "Open the Lab" navigates to `/app` and lands in Build mode; clicking the central reel molecule navigates to `/app?mode=explore` with that molecule loaded
+2. **Build water** — drag O onto scene, drag H, snap to first valence site, drag second H, snap to second site → validity bar reads "✓ Water"
+3. **Library spawn** — search "glucose" → click → scene contains 24 atoms (C₆H₁₂O₆), inspector shows formula and uses
+4. **Lab reaction** — switch to Lab mode, spawn 2 H₂ and 1 O₂, fling H₂ at O₂ → after collision, scene contains 2 H₂O, reaction log shows the equation
+5. **Share roundtrip** — build methane, click Share, open returned URL in a fresh context → scene loads with identical atoms/bonds
+6. **AI tutor** — in Explore mode with water spawned, click "Tell me about this molecule" → streaming response references "two hydrogen atoms bonded to oxygen"
 
 ### CI
 
