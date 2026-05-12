@@ -7,6 +7,7 @@ import { freeCapacity } from '@/src/chem/rules'
 import type { AtomId } from '@/src/chem/types'
 import { useStore } from '@/src/store'
 import { Inspector } from '@/src/ui/Inspector'
+import { LabToolbar } from '@/src/ui/LabToolbar'
 import { LibraryBrowser } from '@/src/ui/LibraryBrowser'
 import { ModeSwitcher } from '@/src/ui/ModeSwitcher'
 import { PeriodicSidebar } from '@/src/ui/PeriodicSidebar'
@@ -212,6 +213,9 @@ export function AppShell() {
           </div>
         </DrawerContent>
       </Drawer>
+
+      {/* Lab-mode toolbar: spawn reactants + run reactions + view log. */}
+      {mode === 'lab' && <LabToolbar />}
     </div>
   )
 }
