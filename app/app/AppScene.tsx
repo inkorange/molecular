@@ -6,8 +6,10 @@ import { spawnLibraryEntry } from '@/src/lib/spawn'
 import { AttachPoints } from '@/src/scene/AttachPoints'
 import { CameraFit } from '@/src/scene/CameraFit'
 import { DragGhost } from '@/src/scene/DragGhost'
+import { DropCatcher } from '@/src/scene/DropCatcher'
 import { Molecule } from '@/src/scene/Molecule'
 import { Scene } from '@/src/scene/Scene'
+import { SelectionMenu } from '@/src/scene/SelectionMenu'
 import { useStore } from '@/src/store'
 
 export function AppScene() {
@@ -40,8 +42,10 @@ export function AppScene() {
         const mBonds = bondList.filter((b) => m.bondIds.includes(b.id))
         return <Molecule key={m.id} atoms={mAtoms} bonds={mBonds} />
       })}
+      <DropCatcher />
       <DragGhost />
       <AttachPoints />
+      <SelectionMenu />
     </Scene>
   )
 }

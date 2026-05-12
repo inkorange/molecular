@@ -1,6 +1,5 @@
 'use client'
 
-import { Button } from '@/components/ui/button'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import { groupedElements, tierMaxZ } from '@/src/lib/elementCategories'
 import { useStore } from '@/src/store'
@@ -10,20 +9,16 @@ interface PeriodicSidebarProps {
   onPick?: () => void
 }
 
+// The "View full table" overlay is planned (DESIGN.md §7) but not yet built.
+// The button is hidden until the modal lands; the store action stays in place
+// so wiring it up later is a one-line change.
+
 export function PeriodicSidebar({ onPick }: PeriodicSidebarProps) {
   const tier = useStore((s) => s.scene.tier)
-  const toggleFullTable = useStore((s) => s.toggleFullTable)
   const groups = groupedElements(tierMaxZ(tier))
 
   return (
     <div className="flex h-full flex-col gap-3 p-3">
-      <Button
-        size="sm"
-        onClick={() => toggleFullTable()}
-        className="min-h-[40px] w-full bg-[#5cc6ff] text-[#07051a] hover:bg-[#7ad6ff]"
-      >
-        View full table →
-      </Button>
       <div className="text-[10px] uppercase tracking-wider text-[#6a6f95]">
         {tier === 'beginner' ? 'Beginner (Z 1–20)' : 'Standard (Z 1–36)'} · tap any card to pick
       </div>
@@ -45,7 +40,7 @@ export function PeriodicSidebar({ onPick }: PeriodicSidebarProps) {
                 <span className="text-[10px] text-[#6a6f95]">{g.entries.length}</span>
               </CollapsibleTrigger>
               <CollapsibleContent>
-                <div className="grid grid-cols-4 gap-1.5 rounded-b-md bg-[#14112e]/60 p-2">
+                <div className="grid grid-cols-4 gap-1.5 rounded-b-md bg-[#14112e]/60 p-2 lg:grid-cols-8">
                   {g.entries.map((e) => (
                     <PaletteCard key={e.Z} element={e} accent={g.accent} onPick={onPick} />
                   ))}

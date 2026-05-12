@@ -22,16 +22,22 @@ export function DragGhost() {
   const { gl } = useThree()
   const screenToWorld = usePointerToWorld()
 
-  // Track pointer movement on the canvas while something is held.
+  // Track pointer movement on the canvas while something is held. Also update
+  // on pointerdown so touch taps (which have no preceding move) commit at the
+  // correct position.
   useEffect(() => {
     if (heldZ === null) return
     const el = gl.domElement
-    function onMove(e: PointerEvent) {
+    function onPointer(e: PointerEvent) {
       const w = screenToWorld(e.clientX, e.clientY)
       if (w) updatePointer(w)
     }
-    el.addEventListener('pointermove', onMove)
-    return () => el.removeEventListener('pointermove', onMove)
+    el.addEventListener('pointermove', onPointer)
+    el.addEventListener('pointerdown', onPointer)
+    return () => {
+      el.removeEventListener('pointermove', onPointer)
+      el.removeEventListener('pointerdown', onPointer)
+    }
   }, [heldZ, gl, screenToWorld, updatePointer])
 
   // Reset the scale tween every time a new element is picked up. heldZ is the

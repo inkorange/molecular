@@ -32,7 +32,7 @@ export function PaletteCard({ element, accent, onPick }: PaletteCardProps) {
       aria-pressed={isHeld}
       aria-label={`${element.name}, atomic number ${element.Z}`}
       className={cn(
-        'relative flex aspect-square min-h-[60px] flex-col justify-between rounded-md px-2 py-1.5 text-left font-mono transition-colors',
+        'relative flex aspect-square min-h-[60px] flex-col justify-between rounded-md px-2 py-1.5 text-left font-mono transition-colors lg:min-h-0',
         isHeld
           ? 'border-2 border-dashed border-[#5cc6ff] bg-transparent text-[#5cc6ff]'
           : 'border border-[#2a2655] bg-[#181536] text-[#dffaff] hover:-translate-y-0.5 hover:shadow-md',
@@ -46,9 +46,16 @@ export function PaletteCard({ element, accent, onPick }: PaletteCardProps) {
             }
       }
     >
-      <span className="text-[8px] text-[#6a6f95]">{element.Z}</span>
-      <span className="text-center text-base font-extrabold">{element.symbol}</span>
-      <span className="text-center text-[7px] text-[#8d92b8]">{element.name}</span>
+      <span className="text-[8px] leading-none text-[#6a6f95] lg:text-xs">{element.Z}</span>
+      <span className="text-center text-base font-extrabold leading-none lg:text-3xl">
+        {element.symbol}
+      </span>
+      <div className="flex flex-col items-center gap-0 leading-none">
+        <span className="text-center text-[7px] text-[#8d92b8] lg:text-[11px]">{element.name}</span>
+        <span className="text-center text-[7px] text-[#6a6f95] lg:text-[10px]">
+          {element.mass.toFixed(2)}
+        </span>
+      </div>
     </button>
   )
 }

@@ -1,7 +1,7 @@
 'use client'
 
 import { Billboard, Text } from '@react-three/drei'
-import { useFrame, useThree } from '@react-three/fiber'
+import { type ThreeEvent, useFrame, useThree } from '@react-three/fiber'
 import { useEffect, useMemo, useRef } from 'react'
 import {
   AdditiveBlending,
@@ -9,13 +9,22 @@ import {
   Float32BufferAttribute,
   type Group,
   LineBasicMaterial,
+  type Mesh,
   Line as ThreeLine,
   Vector3,
   type Vector3Tuple,
 } from 'three'
 import { getElement } from '@/src/chem/elements'
-import type { ElementCategory } from '@/src/chem/types'
+import { freeCapacity } from '@/src/chem/rules'
+import type { AtomId, ElementCategory } from '@/src/chem/types'
+import { usePointerToWorld } from '@/src/lib/usePointerToWorld'
+import { useStore } from '@/src/store'
 import { ElectronSprite } from './ElectronSprite'
+
+// Pointer must move further than this many CSS pixels between down and up
+// for the gesture to be treated as a drag instead of a click. Tuned for
+// touch — a finger can wobble a few pixels on a tap.
+const DRAG_THRESHOLD_PX = 6
 
 const CATEGORY_ACCENT: Record<ElementCategory, string> = {
   alkali: '#FF7A8C',
@@ -38,6 +47,8 @@ const CARD_ACCENT_W = 0.05
 interface AtomProps {
   Z: number
   position: Vector3Tuple
+  /** Set to make the atom selectable; passes the id to the store on click. */
+  atomId?: string
   showLabel?: boolean
   scale?: number
   /** For drag preview: 0..1 opacity multiplier on the nucleus. */
@@ -97,12 +108,144 @@ function buildTrailLine(plan: ElectronPlan): ThreeLine {
 // 6.67 = 5 / 0.75 → cards render 25% smaller than the 5.0 baseline.
 const CARD_REFERENCE_DISTANCE = 6.67
 
-export function Atom({ Z, position, showLabel = true, scale = 1, opacity = 1 }: AtomProps) {
+export function Atom({ Z, position, atomId, showLabel = true, scale = 1, opacity = 1 }: AtomProps) {
   const el = getElement(Z)
   const groupRef = useRef<Group>(null)
   const electronRefs = useRef<Group[]>([])
   const cardRef = useRef<Group>(null)
   const cardTmp = useMemo(() => new Vector3(), [])
+  const targetRingRef = useRef<Mesh>(null)
+
+  // Selection / highlight wiring. Only selectable while in Build mode with
+  // nothing currently held (so the click doesn't fight drag-drop) and the
+  // atomId prop is set (DragGhost passes none).
+  const heldZ = useStore((s) => s.build.heldZ)
+  const mode = useStore((s) => s.scene.mode)
+  const selection = useStore((s) => s.scene.selection)
+  const connectingFromAtomId = useStore((s) => s.build.connectingFromAtomId)
+  const setSelection = useStore((s) => s.setSelection)
+  const cancelConnecting = useStore((s) => s.cancelConnecting)
+  const connectAtoms = useStore((s) => s.connectAtoms)
+  const moveAtom = useStore((s) => s.moveAtom)
+  const inBuild = mode === 'build'
+  const isConnectingSource = inBuild && atomId !== undefined && atomId === connectingFromAtomId
+  // A connect target glows only if it has free valence — atoms already at
+  // their bonding capacity (e.g. an H that's already bonded to something) are
+  // not valid targets and shouldn't visually invite a tap.
+  const atomsMap = useStore((s) => s.scene.atoms)
+  const bondsMap = useStore((s) => s.scene.bonds)
+  const hasFreeValence =
+    atomId !== undefined && freeCapacity(atomId as AtomId, atomsMap, bondsMap) >= 1
+  const isConnectTarget =
+    inBuild &&
+    atomId !== undefined &&
+    connectingFromAtomId !== null &&
+    !isConnectingSource &&
+    hasFreeValence
+  const isSelected =
+    inBuild &&
+    atomId !== undefined &&
+    atomId === (selection as string | null) &&
+    !isConnectingSource
+  // While in connecting mode, every atom is a valid target click (no held-atom check).
+  const selectable =
+    atomId !== undefined && inBuild && (connectingFromAtomId !== null || heldZ === null)
+
+  // Drag-to-reposition state. Refs (not state) so per-move updates don't
+  // re-render the component on every frame — only the store update does,
+  // and that's already throttled by React's batching.
+  const screenToWorld = usePointerToWorld()
+  // Grab the active OrbitControls instance so we can disable rotation while
+  // dragging an atom — drei's makeDefault wiring registers it onto R3F state.
+  const controls = useThree((s) => s.controls) as { enabled: boolean } | null
+  const dragState = useRef<{
+    pointerId: number
+    startClientX: number
+    startClientY: number
+    /** Plane anchor: the atom's world position when the drag started. We
+     *  project subsequent pointer moves through a camera-facing plane at
+     *  this depth so the atom slides in screen-plane parallel to the view. */
+    anchor: readonly [number, number, number]
+    moved: boolean
+  } | null>(null)
+
+  function handlePointerDown(e: ThreeEvent<PointerEvent>) {
+    if (!selectable || atomId === undefined) return
+    e.stopPropagation()
+    const target = e.target as Element | null
+    if (target && 'setPointerCapture' in target) {
+      try {
+        target.setPointerCapture(e.pointerId)
+      } catch {
+        // Older browsers / non-DOM targets — ignore.
+      }
+    }
+    dragState.current = {
+      pointerId: e.pointerId,
+      startClientX: e.clientX,
+      startClientY: e.clientY,
+      anchor: position,
+      moved: false,
+    }
+  }
+
+  function handlePointerMove(e: ThreeEvent<PointerEvent>) {
+    const drag = dragState.current
+    if (!drag || drag.pointerId !== e.pointerId) return
+    const dx = e.clientX - drag.startClientX
+    const dy = e.clientY - drag.startClientY
+    if (!drag.moved && Math.hypot(dx, dy) < DRAG_THRESHOLD_PX) return
+    // First time past threshold: latch into drag mode and quiet OrbitControls.
+    if (!drag.moved) {
+      drag.moved = true
+      if (controls) controls.enabled = false
+    }
+    if (atomId === undefined) return
+    const w = screenToWorld(e.clientX, e.clientY, drag.anchor)
+    if (!w) return
+    moveAtom(atomId as AtomId, w)
+  }
+
+  function handlePointerUp(e: ThreeEvent<PointerEvent>) {
+    const drag = dragState.current
+    if (!drag || drag.pointerId !== e.pointerId) {
+      dragState.current = null
+      return
+    }
+    e.stopPropagation()
+    const target = e.target as Element | null
+    if (target && 'releasePointerCapture' in target) {
+      try {
+        target.releasePointerCapture(e.pointerId)
+      } catch {
+        // Ignore.
+      }
+    }
+    const wasClick = !drag.moved
+    dragState.current = null
+    if (!wasClick) {
+      if (controls) controls.enabled = true
+      return
+    }
+    // Click path — same logic the previous onClick handler had.
+    if (atomId === undefined) return
+    if (connectingFromAtomId !== null) {
+      if (connectingFromAtomId === atomId) {
+        // Tap source again → cancel.
+        cancelConnecting()
+        return
+      }
+      // Only valid targets (free valence) accept the bond. Tapping an
+      // at-capacity atom is a deliberate no-op so the user stays in
+      // connecting mode and can try another atom.
+      if (!hasFreeValence) return
+      connectAtoms(connectingFromAtomId as never, atomId as never)
+      cancelConnecting()
+      setSelection(null)
+      return
+    }
+    setSelection(atomId as never)
+  }
 
   // Viewport-relative card sizing. The DESIGN.md breakpoints:
   //   < 720px       → mobile (~0.56× desktop card size)
@@ -157,7 +300,7 @@ export function Atom({ Z, position, showLabel = true, scale = 1, opacity = 1 }: 
     }
   }, [trailLines])
 
-  useFrame(({ camera }, delta) => {
+  useFrame(({ camera, clock }, delta) => {
     // Electron orbits.
     for (let i = 0; i < electronRefs.current.length; i++) {
       const ref = electronRefs.current[i]
@@ -173,17 +316,46 @@ export function Atom({ Z, position, showLabel = true, scale = 1, opacity = 1 }: 
       const d = camera.position.distanceTo(cardTmp)
       cardRef.current.scale.setScalar((d / CARD_REFERENCE_DISTANCE) * cardViewportScale)
     }
+    // Subtle breathing pulse on the connect-target ring so it reads as
+    // "tap me" rather than a static decoration.
+    if (targetRingRef.current) {
+      const pulse = 1 + 0.12 * Math.sin(clock.elapsedTime * 4)
+      targetRingRef.current.scale.setScalar(pulse)
+    }
   })
 
   return (
     <group ref={groupRef} position={position} scale={[scale, scale, scale]}>
+      {/* Selection ring — cyan when this atom is the current selection,
+          pink while it's the source of a pending connect. */}
+      {(isSelected || isConnectingSource) && (
+        <mesh rotation={[Math.PI / 2, 0, 0]}>
+          <torusGeometry args={[NUCLEUS_RADIUS * 1.45, NUCLEUS_RADIUS * 0.08, 16, 48]} />
+          <meshBasicMaterial
+            color={isConnectingSource ? '#ec59b6' : '#5cc6ff'}
+            toneMapped={false}
+          />
+        </mesh>
+      )}
+      {/* Connect-target halo — pulsing attach-green ring on every atom that
+          isn't the source while a connect is pending, signalling "tap me". */}
+      {isConnectTarget && (
+        <mesh ref={targetRingRef} rotation={[Math.PI / 2, 0, 0]}>
+          <torusGeometry args={[NUCLEUS_RADIUS * 1.7, NUCLEUS_RADIUS * 0.1, 16, 48]} />
+          <meshBasicMaterial color="#a4ff8c" transparent opacity={0.85} toneMapped={false} />
+        </mesh>
+      )}
       {/* Nucleus */}
-      <mesh>
+      <mesh
+        onPointerDown={handlePointerDown}
+        onPointerMove={handlePointerMove}
+        onPointerUp={handlePointerUp}
+      >
         <sphereGeometry args={[NUCLEUS_RADIUS, 32, 32]} />
         <meshStandardMaterial
           color={el.cpkColor}
-          emissive={el.cpkColor}
-          emissiveIntensity={0.4}
+          emissive={isConnectingSource ? '#ec59b6' : isSelected ? '#5cc6ff' : el.cpkColor}
+          emissiveIntensity={isConnectingSource || isSelected ? 1.2 : 0.4}
           roughness={0.28}
           metalness={0.35}
           transparent={opacity < 1}
@@ -205,7 +377,12 @@ export function Atom({ Z, position, showLabel = true, scale = 1, opacity = 1 }: 
           {/* Category accent strip on the left edge */}
           <mesh position={[-CARD_W / 2 + CARD_ACCENT_W / 2, 0, 0.001]}>
             <planeGeometry args={[CARD_ACCENT_W, CARD_H]} />
-            <meshBasicMaterial color={CATEGORY_ACCENT[el.category]} toneMapped={false} />
+            <meshBasicMaterial
+              color={CATEGORY_ACCENT[el.category]}
+              transparent
+              opacity={0.75}
+              toneMapped={false}
+            />
           </mesh>
           {/* Atomic number (top-left) */}
           <Text
