@@ -24,6 +24,7 @@ Each phase ends with something you can show in a browser or run as a passing tes
 | 3 | Molecule Library + Explore mode | Open `/app`, search "glucose" in the sidebar, click → C₆H₁₂O₆ spawns in the scene; inspector shows metadata |
 | 4 | Periodic table palette + Build mode (drag-snap) | Switch to Build, drag O + 2 H from the palette → water snaps together; validity bar reads ✓ Water |
 | 5 | Lab mode + physics + reactions | Switch to Lab, spawn H₂ and O₂, fling one at the other → water forms; reaction log records "2 H₂ + O₂ → 2 H₂O" |
+| 5.2 | Recipe hints in Lab | Lab toolbar gains a 💡 Hints sheet — given current scene, suggests reactions you have ingredients for (or near-misses with "Add X" buttons) |
 | 6 | AI tutor | Click "Tell me about this molecule" → streaming explanation appears in the tutor panel |
 | 7 | Landing page with autonomous reel | Visit `/`, see water → methane → ammonia → NaCl cycle on loop with hero copy in front |
 | 8 | Persistence + sharing | Build a molecule, click Share, paste link in a fresh tab → identical scene loads |
@@ -5808,6 +5809,97 @@ git push
 ```
 
 **🎉 Phase 5 demoable:** In Lab mode, add reactants from the toolbar and tap React — products spawn, log records the equation.
+
+---
+
+# Phase 5.2 — Recipe hints (post-Phase-5 follow-up)
+
+**Goal:** Surface what's *possible* given the molecules currently in the Lab so users don't have to guess at combinations. Reactive hint panel that watches the scene + the pending-reactant pool and lists reactions the player could trigger — either ones they already have the ingredients for, or "near-misses" that just need one more reactant. Same chemistry engine, layered hint UI on top.
+
+**Motivation:** Lab is currently strong on mechanics but discovery is opaque. A new user opens the toolbar, adds a couple of molecules, and has no idea whether anything will combine — they only learn the reaction database by trial and error. A hint panel turns the Lab from "guess at chemistry" into "guided sandbox experimentation".
+
+**Architecture:** Pure derived view — no new persistent state. A `useRecipeHints()` hook reads `scene.molecules` (or the lab-slice `pendingReactantIds`) plus the static `REACTIONS` table and returns ranked recipe suggestions. A `<RecipeHintPanel>` component renders the suggestions inside a new sheet attached to the LabToolbar. Tapping a hint either fires the reaction directly (if all ingredients are present) or pre-adds the missing reactants and queues them in the pending pool.
+
+**Files created:**
+- `src/lib/recipeHints.ts` — `getRecipeHints(scene, pending)` → ranked `RecipeHint[]`
+- `src/ui/RecipeHintPanel.tsx` — UI list of hints with affordances per state
+- `tests/lib/recipeHints.spec.ts` — unit coverage for the ranker
+
+**Files modified:**
+- `src/ui/LabToolbar.tsx` — add a "💡 Hints" button that opens the recipe panel as a Sheet
+- `src/store/labSlice.ts` — optional `dismissedHints: Set<string>` so users can hide hints they've already seen
+
+### Task 5.2.1 — Hint data model + ranker
+
+**Files:**
+- Create: `src/lib/recipeHints.ts`
+- Create: `tests/lib/recipeHints.spec.ts`
+
+`RecipeHint` shape:
+```ts
+export interface RecipeHint {
+  reactionId: string
+  equation: string        // "2 H₂ + O₂ → 2 H₂O"
+  enthalpy: 'exothermic' | 'endothermic'
+  status: 'ready' | 'missing'   // ready = fire now; missing = needs more reactants
+  missing: { formula: string; count: number }[]  // empty when status==='ready'
+  matchedMoleculeIds: string[]  // scene ids satisfying the recipe (for visualization)
+}
+```
+
+Ranker rules (in priority order):
+1. **status === 'ready'** comes first — these are immediately actionable.
+2. Within 'ready', prefer reactions where ALL reactants are in `pendingReactantIds` (the user explicitly set this up).
+3. **status === 'missing'** ranked by `1 - (missingCount / totalReactantCount)` — closer to ready ranks higher.
+4. Cap to top 6 results so the panel doesn't overwhelm.
+
+Test cases:
+- Empty scene → empty hints
+- 1 H₂O alone → suggests `water-electrolysis` as missing (needs 1 more H₂O)
+- 2 H₂ + 1 O₂ → ready for `water-synthesis`
+- 1 H₂ + 1 O₂ → missing 1 H₂ for `water-synthesis`
+- Scene with H₂ + N₂ → suggests `ammonia-synthesis` as missing (needs 2 more H₂ and 0 N₂)
+
+### Task 5.2.2 — RecipeHintPanel UI
+
+**Files:**
+- Create: `src/ui/RecipeHintPanel.tsx`
+
+For each hint, render a card:
+- **Ready hints**: equation in green border, primary action button `Combine` (fires `tryReact` scoped to `matchedMoleculeIds`).
+- **Missing hints**: equation in dim style, "Add X" buttons for each missing reactant. Tapping "Add" calls `add(libIdForFormula)` so the user can build toward the recipe one step at a time.
+- Show the enthalpy badge (cyan for exothermic, amber for endothermic).
+- Show a "What is this?" affordance that opens the AI tutor (Phase 6 hookup — graceful no-op until then).
+
+Visual treatment matches the Inspector card styling — dark `#14112e` background, asymmetric reactant/product layout with the arrow.
+
+### Task 5.2.3 — Hook up to LabToolbar
+
+**Files:**
+- Modify: `src/ui/LabToolbar.tsx`
+
+Add a fourth toolbar button between "More reactants…" and "Combine reactants":
+```tsx
+<Button onClick={() => setHintsOpen(true)} ...>
+  💡 Hints
+</Button>
+```
+
+Sheet opens from the right (mirror of Reaction Log). Auto-open the panel on first lab visit so newcomers see the affordance immediately — gate via a `localStorage` flag `molecular.lab.hintsSeen`.
+
+### Task 5.2.4 — Wire to the existing pending pool + applyReaction
+
+When a user taps "Combine" on a ready hint, the hint's `matchedMoleculeIds` are passed directly to `applyReaction(reaction, matchedMoleculeIds)`. This bypasses the global `tryReact` matcher and runs exactly the reaction the user picked — avoids the situation where two reactions could be satisfied by the same molecules and the wrong one fires.
+
+When a user taps "Add X" on a missing hint, call the existing `add(libId)` flow with the formula→libId mapping. Pre-existing `addPendingReactant` ensures the new molecule shows up in the pending pool, so the hint card's status updates from 'missing' to 'ready' once enough have been added.
+
+### Task 5.2.5 — Polish
+
+- **Animate hint card transitions** when status flips missing → ready (subtle scale or border-color tween).
+- **Persist `dismissedHints`** in lab slice so the user can hide hints they've already explored. A small `×` per card writes the reactionId into the set; cleared by Reset.
+- **Optional in-canvas highlight**: when a hint card is hovered/focused, briefly highlight the matched molecules in the 3D scene (cyan outline). Requires LabMolecule to accept a `highlight?: boolean` prop wired from the panel's hover state.
+
+**🎉 Phase 5.2 demoable:** Open Lab, tap 💡 Hints. With nothing added: blank panel. Add an H₂ — panel shows "missing 1 H₂ + 1 O₂ for water-synthesis". Tap "Add O₂" twice from the hint card itself — panel flips to ready. Tap Combine — water spawns.
 
 ---
 
