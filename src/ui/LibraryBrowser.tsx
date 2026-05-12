@@ -1,0 +1,88 @@
+'use client'
+
+import { useMemo, useState } from 'react'
+import { Input } from '@/components/ui/input'
+import { ScrollArea } from '@/components/ui/scroll-area'
+import { CATEGORY_LABEL, LIBRARY, LIBRARY_CATEGORIES } from '@/src/data/molecules'
+import { spawnLibraryEntry } from '@/src/lib/spawn'
+import { useStore } from '@/src/store'
+
+export function LibraryBrowser({ onPick }: { onPick?: () => void }) {
+  const [query, setQuery] = useState('')
+  const addAtom = useStore((s) => s.addAtom)
+  const addBond = useStore((s) => s.addBond)
+  const addMolecule = useStore((s) => s.addMolecule)
+  const resetScene = useStore((s) => s.resetScene)
+
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase()
+    if (!q) return LIBRARY
+    return LIBRARY.filter(
+      (m) =>
+        m.name.toLowerCase().includes(q) ||
+        m.formula.toLowerCase().includes(q) ||
+        m.category.toLowerCase().includes(q),
+    )
+  }, [query])
+
+  const groups = useMemo(() => {
+    const map = new Map<string, typeof LIBRARY>()
+    for (const m of filtered) {
+      const arr = map.get(m.category) ?? []
+      arr.push(m)
+      map.set(m.category, arr)
+    }
+    return LIBRARY_CATEGORIES.filter((c) => map.has(c)).map((c) => ({
+      category: c,
+      entries: map.get(c) ?? [],
+    }))
+  }, [filtered])
+
+  function pick(id: string) {
+    const entry = LIBRARY.find((m) => m.id === id)
+    if (!entry) return
+    resetScene()
+    const result = spawnLibraryEntry(entry)
+    addMolecule(result.molecule)
+    for (const a of result.atoms) addAtom(a)
+    for (const b of result.bonds) addBond(b)
+    onPick?.()
+  }
+
+  return (
+    <div className="flex h-full flex-col gap-3 p-3">
+      <Input
+        type="search"
+        placeholder="Search molecules…"
+        value={query}
+        onChange={(e) => setQuery(e.target.value)}
+        className="border-[#2a2655] bg-[#14112e] text-[#dffaff] placeholder:text-[#6a6f95]"
+      />
+      <ScrollArea className="flex-1">
+        <div className="flex flex-col gap-3">
+          {groups.map(({ category, entries }) => (
+            <section key={category}>
+              <h3 className="mb-1.5 text-[10px] font-bold uppercase tracking-wider text-[#8d92b8]">
+                {CATEGORY_LABEL[category]}
+              </h3>
+              <ul className="flex flex-col gap-1">
+                {entries.map((m) => (
+                  <li key={m.id}>
+                    <button
+                      type="button"
+                      onClick={() => pick(m.id)}
+                      className="flex min-h-[44px] w-full items-baseline justify-between rounded-md border border-transparent bg-[#14112e] px-3 py-2 text-left text-sm text-[#dffaff] transition-colors hover:border-[#5cc6ff]/40 hover:bg-[#1a163a] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5cc6ff]"
+                    >
+                      <span className="font-medium">{m.name}</span>
+                      <span className="font-mono text-xs text-[#9aa0c8]">{m.formula}</span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          ))}
+        </div>
+      </ScrollArea>
+    </div>
+  )
+}
