@@ -8,6 +8,7 @@ import { CameraFit } from '@/src/scene/CameraFit'
 import { DragGhost } from '@/src/scene/DragGhost'
 import { DropCatcher } from '@/src/scene/DropCatcher'
 import { Molecule } from '@/src/scene/Molecule'
+import { PhysicsWrapper } from '@/src/scene/PhysicsWrapper'
 import { Scene } from '@/src/scene/Scene'
 import { SelectionMenu } from '@/src/scene/SelectionMenu'
 import { useStore } from '@/src/store'
@@ -37,11 +38,13 @@ export function AppScene() {
   return (
     <Scene>
       <CameraFit />
-      {Object.values(molecules).map((m) => {
-        const mAtoms = atomList.filter((a) => a.moleculeId === m.id)
-        const mBonds = bondList.filter((b) => m.bondIds.includes(b.id))
-        return <Molecule key={m.id} atoms={mAtoms} bonds={mBonds} />
-      })}
+      <PhysicsWrapper>
+        {Object.values(molecules).map((m) => {
+          const mAtoms = atomList.filter((a) => a.moleculeId === m.id)
+          const mBonds = bondList.filter((b) => m.bondIds.includes(b.id))
+          return <Molecule key={m.id} atoms={mAtoms} bonds={mBonds} />
+        })}
+      </PhysicsWrapper>
       <DropCatcher />
       <DragGhost />
       <AttachPoints />
