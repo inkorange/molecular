@@ -59,7 +59,7 @@ export function AppShell() {
         </DrawerTrigger>
         <DrawerContent className="border-[#2a2655] bg-[#0d0a22]">
           <DrawerTitle className="sr-only">Molecule Library</DrawerTitle>
-          <div className="h-[70vh]">
+          <div className="flex h-[70vh] min-h-0 flex-col overflow-hidden">
             <LibraryBrowser onPick={() => setDrawerOpen(false)} />
           </div>
         </DrawerContent>

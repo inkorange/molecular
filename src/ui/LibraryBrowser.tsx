@@ -2,7 +2,6 @@
 
 import { useMemo, useState } from 'react'
 import { Input } from '@/components/ui/input'
-import { ScrollArea } from '@/components/ui/scroll-area'
 import { CATEGORY_LABEL, LIBRARY, LIBRARY_CATEGORIES } from '@/src/data/molecules'
 import { spawnLibraryEntry } from '@/src/lib/spawn'
 import { useStore } from '@/src/store'
@@ -58,8 +57,13 @@ export function LibraryBrowser({ onPick }: { onPick?: () => void }) {
         onChange={(e) => setQuery(e.target.value)}
         className="border-[#2a2655] bg-[#14112e] text-[#dffaff] placeholder:text-[#6a6f95]"
       />
-      <ScrollArea className="flex-1">
-        <div className="flex flex-col gap-3">
+      {/* Plain overflow-y-auto + min-h-0 reliably scrolls inside a flex column;
+          Radix ScrollArea was swallowing flex-1 height inside the drawer. */}
+      <div
+        className="-mr-3 min-h-0 flex-1 overflow-y-auto pr-3"
+        style={{ WebkitOverflowScrolling: 'touch' }}
+      >
+        <div className="flex flex-col gap-3 pb-6">
           {groups.map(({ category, entries }) => (
             <section key={category}>
               <h3 className="mb-1.5 text-[10px] font-bold uppercase tracking-wider text-[#8d92b8]">
@@ -82,7 +86,7 @@ export function LibraryBrowser({ onPick }: { onPick?: () => void }) {
             </section>
           ))}
         </div>
-      </ScrollArea>
+      </div>
     </div>
   )
 }
