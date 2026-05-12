@@ -3,7 +3,7 @@
 import { Billboard, Line, Text } from '@react-three/drei'
 import { useFrame } from '@react-three/fiber'
 import { useMemo, useRef } from 'react'
-import type { Group, Vector3Tuple } from 'three'
+import { AdditiveBlending, type Group, type Vector3Tuple } from 'three'
 import { getElement } from '@/src/chem/elements'
 import { ElectronSprite } from './ElectronSprite'
 
@@ -131,10 +131,11 @@ export function Atom({ Z, position, showLabel = true, scale = 1, opacity = 1 }: 
         for (let k = 0; k < TAIL_POINTS; k++) {
           const angle = trailDir * (k / (TAIL_POINTS - 1)) * TAIL_ARC
           tailPoints.push([Math.cos(angle) * plan.radius, 0, Math.sin(angle) * plan.radius])
-          // Color fades from bright at the head to dark at the tail. Stored
-          // pre-multiplied so the additive Line material reads as gradient brightness.
+          // Color fades from bright at the head to near-black at the tail.
+          // With additive blending below, near-black contributes nothing — so the
+          // tail effectively becomes "transparent" over both the atom and space.
           const fade = 1 - k / (TAIL_POINTS - 1)
-          const intensity = 0.18 * fade ** 1.2
+          const intensity = 0.7 * fade ** 1.4
           tailColors.push([intensity, intensity * 0.92, intensity * 0.55])
         }
 
@@ -148,13 +149,18 @@ export function Atom({ Z, position, showLabel = true, scale = 1, opacity = 1 }: 
                 }
               }}
             >
-              {/* The trail line — continuous, no dot artifacts. */}
+              {/* The trail line — continuous, no dot artifacts.
+                  Additive blending makes the line glow over dark backgrounds
+                  and disappear over bright ones (rather than rendering as dark
+                  hairlines over the atom). */}
               <Line
                 points={tailPoints}
                 vertexColors={tailColors}
                 lineWidth={2.2}
                 transparent
                 opacity={1}
+                material-blending={AdditiveBlending}
+                material-depthWrite={false}
               />
               {/* The head — a single bright sprite at the leading position. */}
               <ElectronSprite
