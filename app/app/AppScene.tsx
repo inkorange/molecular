@@ -4,6 +4,7 @@ import { useEffect } from 'react'
 import { getLibraryEntry } from '@/src/data/molecules'
 import { spawnLibraryEntry } from '@/src/lib/spawn'
 import { CameraFit } from '@/src/scene/CameraFit'
+import { DragGhost } from '@/src/scene/DragGhost'
 import { Molecule } from '@/src/scene/Molecule'
 import { Scene } from '@/src/scene/Scene'
 import { useStore } from '@/src/store'
@@ -38,6 +39,7 @@ export function AppScene() {
         const mBonds = bondList.filter((b) => m.bondIds.includes(b.id))
         return <Molecule key={m.id} atoms={mAtoms} bonds={mBonds} />
       })}
+      <DragGhost />
     </Scene>
   )
 }
