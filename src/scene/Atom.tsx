@@ -27,8 +27,8 @@ interface ElectronPlan {
 }
 
 const NUCLEUS_RADIUS = 0.2
-const SHELL_RADIUS_BASE = 0.4
-const SHELL_RADIUS_STEP = 0.18
+const SHELL_RADIUS_BASE = 0.32
+const SHELL_RADIUS_STEP = 0.16
 const MAX_ELECTRONS_VISIBLE = 8
 // Each electron renders as a trailing arc of sprites to give the impression
 // of speed + motion blur. TRAIL_LENGTH includes the head sprite at full opacity.
@@ -116,7 +116,7 @@ export function Atom({ Z, position, showLabel = true, scale = 1, opacity = 1 }: 
           starting phase, and signed rotation speed. The trail of fading sprites
           rides with the electron's group. */}
       {electronPlans.map((plan, idx) => {
-        const baseScale = plan.isValence ? 0.055 : 0.04
+        const baseScale = plan.isValence ? 0.04 : 0.03
         const color = plan.isValence ? '#fff5b8' : '#ffd97a'
         const trailSprites = Array.from({ length: TRAIL_LENGTH }, (_, k) => {
           // k=0 is the head at +X on the orbital ring; higher k = behind the head.
@@ -131,8 +131,8 @@ export function Atom({ Z, position, showLabel = true, scale = 1, opacity = 1 }: 
             ] as Vector3Tuple,
             // Trail sprites grow very slightly to read as motion blur.
             scale: baseScale * (1 + k * 0.1),
-            // Opacity tapers exponentially toward the tail.
-            opacity: 0.18 + 0.82 * fade ** 1.6,
+            // Cap head opacity at 50% and taper exponentially toward the tail.
+            opacity: (0.18 + 0.82 * fade ** 1.6) * 0.5,
           }
         })
         return (
