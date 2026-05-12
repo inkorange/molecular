@@ -25,10 +25,14 @@ interface ShellPlan {
   isValence: boolean
 }
 
-const NUCLEUS_RADIUS = 0.3
-const SHELL_RADIUS_BASE = 0.5
+const NUCLEUS_RADIUS = 0.2
+const SHELL_RADIUS_BASE = 0.4
 const SHELL_RADIUS_STEP = 0.18
 const MAX_ELECTRONS_VISIBLE = 8
+// Each electron renders as a trailing arc of sprites to give the impression
+// of speed + motion blur. TRAIL_LENGTH includes the head sprite at full opacity.
+const TRAIL_LENGTH = 8
+const TRAIL_ARC = Math.PI / 3 // span of the trail in radians (60°)
 
 export function Atom({ Z, position, showLabel = true, scale = 1, opacity = 1 }: AtomProps) {
   const el = getElement(Z)
@@ -43,7 +47,8 @@ export function Atom({ Z, position, showLabel = true, scale = 1, opacity = 1 }: 
         id: `shell-${index}`,
         radius: SHELL_RADIUS_BASE + index * SHELL_RADIUS_STEP,
         tilt: [(tiltX * Math.PI) / 180, 0, (tiltZ * Math.PI) / 180],
-        speed: 1.5 - index * 0.2,
+        // Super-fast orbits; inner shells fastest, outer slower but still rapid.
+        speed: 9 - index * 1.2,
         electrons: Math.min(electronCount, MAX_ELECTRONS_VISIBLE),
         isValence: index === el.shells.length - 1,
       }
@@ -91,19 +96,33 @@ export function Atom({ Z, position, showLabel = true, scale = 1, opacity = 1 }: 
         </Billboard>
       )}
 
-      {/* Electron shells */}
+      {/* Electron shells — each electron is a trail of fading, slightly-blurred
+          sprites along an arc behind its head position, suggesting motion. */}
       {shells.map((plan, shellIndex) => {
-        const electronPositions = Array.from({ length: plan.electrons }, (_, i) => {
-          const angle = (i / plan.electrons) * Math.PI * 2
-          return {
-            id: `${plan.id}-e${i}`,
-            position: [
-              Math.cos(angle) * plan.radius,
-              0,
-              Math.sin(angle) * plan.radius,
-            ] as Vector3Tuple,
+        const baseScale = plan.isValence ? 0.11 : 0.08
+        const color = plan.isValence ? '#fff5b8' : '#ffd97a'
+        const trailSprites: Array<{
+          id: string
+          position: Vector3Tuple
+          scale: number
+          opacity: number
+        }> = []
+        for (let i = 0; i < plan.electrons; i++) {
+          const headAngle = (i / plan.electrons) * Math.PI * 2
+          for (let k = 0; k < TRAIL_LENGTH; k++) {
+            // k=0 is the head (full opacity); higher k = further behind & dimmer.
+            const angle = headAngle - (k / TRAIL_LENGTH) * TRAIL_ARC
+            const fade = 1 - k / TRAIL_LENGTH
+            trailSprites.push({
+              id: `${plan.id}-e${i}-t${k}`,
+              position: [Math.cos(angle) * plan.radius, 0, Math.sin(angle) * plan.radius],
+              // Trail sprites grow slightly to read as motion blur.
+              scale: baseScale * (1 + k * 0.18),
+              // Opacity tapers exponentially toward the tail.
+              opacity: 0.18 + 0.82 * fade ** 1.6,
+            })
           }
-        })
+        }
         return (
           <group
             key={plan.id}
@@ -112,12 +131,13 @@ export function Atom({ Z, position, showLabel = true, scale = 1, opacity = 1 }: 
             }}
             rotation={plan.tilt}
           >
-            {electronPositions.map((e) => (
+            {trailSprites.map((s) => (
               <ElectronSprite
-                key={e.id}
-                position={e.position}
-                scale={plan.isValence ? 0.1 : 0.07}
-                color={plan.isValence ? '#fff5b8' : '#ffd97a'}
+                key={s.id}
+                position={s.position}
+                scale={s.scale}
+                color={color}
+                opacity={s.opacity}
               />
             ))}
           </group>
