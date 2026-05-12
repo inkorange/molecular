@@ -6,12 +6,16 @@ import { Drawer, DrawerContent, DrawerTitle, DrawerTrigger } from '@/components/
 import { freeCapacity } from '@/src/chem/rules'
 import type { AtomId } from '@/src/chem/types'
 import { useStore } from '@/src/store'
+import type { Mode } from '@/src/store/sceneSlice'
 import { Inspector } from '@/src/ui/Inspector'
+import { LabToolbar } from '@/src/ui/LabToolbar'
 import { LibraryBrowser } from '@/src/ui/LibraryBrowser'
 import { ModeSwitcher } from '@/src/ui/ModeSwitcher'
 import { PeriodicSidebar } from '@/src/ui/PeriodicSidebar'
 import { ValidityBar } from '@/src/ui/ValidityBar'
 import { AppScene } from './AppScene'
+
+const VALID_MODES = new Set<Mode>(['explore', 'build', 'lab'])
 
 export function AppShell() {
   const [drawerOpen, setDrawerOpen] = useState(false)
@@ -24,6 +28,28 @@ export function AppShell() {
   const cancelConnecting = useStore((s) => s.cancelConnecting)
   const sceneAtoms = useStore((s) => s.scene.atoms)
   const sceneBonds = useStore((s) => s.scene.bonds)
+  const setMode = useStore((s) => s.setMode)
+
+  // Hydrate mode from ?mode=... on first mount so a refresh preserves the
+  // user's current mode. setMode is stable from Zustand so including it in
+  // deps doesn't cause additional runs.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const requested = params.get('mode')
+    if (requested && VALID_MODES.has(requested as Mode)) {
+      const current = useStore.getState().scene.mode
+      if (current !== requested) setMode(requested as Mode)
+    }
+  }, [setMode])
+
+  // Write-side: any time mode changes, replace the URL's ?mode= without
+  // navigating (history.replaceState avoids a Next.js route transition).
+  useEffect(() => {
+    const url = new URL(window.location.href)
+    if (url.searchParams.get('mode') === mode) return
+    url.searchParams.set('mode', mode)
+    window.history.replaceState(null, '', url.toString())
+  }, [mode])
 
   // While in connecting mode, check whether any OTHER atom in the scene still
   // has a free bond slot. If not, the banner shifts from the cyan "tap another
@@ -212,6 +238,9 @@ export function AppShell() {
           </div>
         </DrawerContent>
       </Drawer>
+
+      {/* Lab-mode toolbar: spawn reactants + run reactions + view log. */}
+      {mode === 'lab' && <LabToolbar />}
     </div>
   )
 }

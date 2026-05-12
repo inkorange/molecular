@@ -13,6 +13,8 @@ interface MoleculeSummary {
   name: string
   atomCount: number
   bondCount: number
+  covalentCount: number
+  ionicCount: number
   totalElectrons: number
   uses?: string
   description?: string
@@ -25,12 +27,15 @@ function summarize(molecule: Molecule, scene: SceneSnapshot): MoleculeSummary | 
   const formula = getFormula(atoms)
   const entry = LIBRARY.find((m) => m.formula === formula)
   const totalElectrons = atoms.reduce((sum, a) => sum + a.Z, 0)
+  const ionicCount = bonds.filter((b) => b.type === 'ionic').length
   return {
     id: molecule.id,
     formula,
     name: NAMED_MOLECULES[formula] ?? entry?.name ?? '—',
     atomCount: atoms.length,
     bondCount: bonds.length,
+    covalentCount: bonds.length - ionicCount,
+    ionicCount,
     totalElectrons,
     uses: entry?.uses,
     description: entry?.description,
@@ -107,6 +112,36 @@ export function Inspector() {
               <div className="font-mono text-lg">{s.totalElectrons}</div>
             </div>
           </section>
+          {s.bondCount > 0 && (
+            <section className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-[#9aa0c8]">
+              {s.covalentCount > 0 && (
+                <span className="inline-flex items-center gap-1.5">
+                  {/* Swatch matches the gray-blue tube color used in the 3D scene. */}
+                  <span
+                    aria-hidden
+                    className="inline-block h-2.5 w-2.5 rounded-full"
+                    style={{ background: '#3d5a78' }}
+                  />
+                  <span>
+                    <span className="font-mono text-[#dffaff]">{s.covalentCount}</span> covalent
+                  </span>
+                </span>
+              )}
+              {s.ionicCount > 0 && (
+                <span className="inline-flex items-center gap-1.5">
+                  {/* Swatch matches the attach-green ionic bond color. */}
+                  <span
+                    aria-hidden
+                    className="inline-block h-2.5 w-2.5 rounded-full"
+                    style={{ background: '#a4ff8c' }}
+                  />
+                  <span>
+                    <span className="font-mono text-[#dffaff]">{s.ionicCount}</span> ionic
+                  </span>
+                </span>
+              )}
+            </section>
+          )}
         </article>
       ))}
     </div>
