@@ -32,8 +32,8 @@ const SHELL_RADIUS_STEP = 0.16
 const MAX_ELECTRONS_VISIBLE = 8
 // Each electron renders as a trailing arc of sprites to give the impression
 // of speed + motion blur. TRAIL_LENGTH includes the head sprite at full opacity.
-const TRAIL_LENGTH = 6
-const TRAIL_ARC = Math.PI / 5 // span of the trail in radians (36°)
+const TRAIL_LENGTH = 10
+const TRAIL_ARC = Math.PI / 2.5 // span of the trail in radians (72°)
 
 export function Atom({ Z, position, showLabel = true, scale = 1, opacity = 1 }: AtomProps) {
   const el = getElement(Z)
