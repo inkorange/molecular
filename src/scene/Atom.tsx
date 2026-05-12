@@ -150,14 +150,18 @@ export function Atom({ Z, position, showLabel = true, scale = 1, opacity = 1 }: 
 
       {/* Label */}
       {showLabel && (
-        <Billboard>
+        <Billboard renderOrder={2}>
           <Text
             fontSize={0.22}
             color="#ffffff"
             anchorX="center"
             anchorY="middle"
-            outlineWidth={0.01}
+            outlineWidth={0.018}
             outlineColor="#000000"
+            outlineBlur={0.005}
+            material-depthTest={false}
+            material-depthWrite={false}
+            material-transparent
           >
             {el.symbol}
           </Text>
