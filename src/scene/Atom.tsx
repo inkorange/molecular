@@ -31,8 +31,8 @@ const SHELL_RADIUS_STEP = 0.18
 const MAX_ELECTRONS_VISIBLE = 8
 // Each electron renders as a trailing arc of sprites to give the impression
 // of speed + motion blur. TRAIL_LENGTH includes the head sprite at full opacity.
-const TRAIL_LENGTH = 8
-const TRAIL_ARC = Math.PI / 3 // span of the trail in radians (60°)
+const TRAIL_LENGTH = 6
+const TRAIL_ARC = Math.PI / 5 // span of the trail in radians (36°)
 
 export function Atom({ Z, position, showLabel = true, scale = 1, opacity = 1 }: AtomProps) {
   const el = getElement(Z)
@@ -99,7 +99,7 @@ export function Atom({ Z, position, showLabel = true, scale = 1, opacity = 1 }: 
       {/* Electron shells — each electron is a trail of fading, slightly-blurred
           sprites along an arc behind its head position, suggesting motion. */}
       {shells.map((plan, shellIndex) => {
-        const baseScale = plan.isValence ? 0.11 : 0.08
+        const baseScale = plan.isValence ? 0.055 : 0.04
         const color = plan.isValence ? '#fff5b8' : '#ffd97a'
         const trailSprites: Array<{
           id: string
@@ -116,8 +116,8 @@ export function Atom({ Z, position, showLabel = true, scale = 1, opacity = 1 }: 
             trailSprites.push({
               id: `${plan.id}-e${i}-t${k}`,
               position: [Math.cos(angle) * plan.radius, 0, Math.sin(angle) * plan.radius],
-              // Trail sprites grow slightly to read as motion blur.
-              scale: baseScale * (1 + k * 0.18),
+              // Trail sprites grow very slightly to read as motion blur.
+              scale: baseScale * (1 + k * 0.1),
               // Opacity tapers exponentially toward the tail.
               opacity: 0.18 + 0.82 * fade ** 1.6,
             })
