@@ -16,12 +16,13 @@ interface AtomProps {
   opacity?: number
 }
 
-interface ShellPlan {
+interface ElectronPlan {
   id: string
   radius: number
   tilt: [number, number, number]
+  phaseOffset: number
+  // Signed rotation speed in rad/s. Sign controls direction (cw / ccw).
   speed: number
-  electrons: number
   isValence: boolean
 }
 
@@ -37,28 +38,43 @@ const TRAIL_ARC = Math.PI / 5 // span of the trail in radians (36°)
 export function Atom({ Z, position, showLabel = true, scale = 1, opacity = 1 }: AtomProps) {
   const el = getElement(Z)
   const groupRef = useRef<Group>(null)
-  const shellRefs = useRef<Group[]>([])
+  const electronRefs = useRef<Group[]>([])
 
-  const shells: ShellPlan[] = useMemo(() => {
-    return el.shells.map((electronCount, index) => {
-      const tiltX = ((index * 37) % 60) - 30
-      const tiltZ = ((index * 53) % 60) - 30
-      return {
-        id: `shell-${index}`,
-        radius: SHELL_RADIUS_BASE + index * SHELL_RADIUS_STEP,
-        tilt: [(tiltX * Math.PI) / 180, 0, (tiltZ * Math.PI) / 180],
-        // Super-fast orbits; inner shells fastest, outer slower but still rapid.
-        speed: 9 - index * 1.2,
-        electrons: Math.min(electronCount, MAX_ELECTRONS_VISIBLE),
-        isValence: index === el.shells.length - 1,
+  const electronPlans: ElectronPlan[] = useMemo(() => {
+    const plans: ElectronPlan[] = []
+    let globalIdx = 0
+    for (let shellIdx = 0; shellIdx < el.shells.length; shellIdx++) {
+      const shellSize = el.shells[shellIdx] ?? 0
+      const electronsInShell = Math.min(shellSize, MAX_ELECTRONS_VISIBLE)
+      const radius = SHELL_RADIUS_BASE + shellIdx * SHELL_RADIUS_STEP
+      const isValence = shellIdx === el.shells.length - 1
+      for (let i = 0; i < electronsInShell; i++) {
+        // Deterministic per-electron variation via prime-product hashing:
+        // each electron gets its own tilt, starting phase, and signed speed.
+        const tiltXDeg = ((globalIdx * 47 + 17) % 180) - 90
+        const tiltZDeg = ((globalIdx * 73 + 31) % 180) - 90
+        const phaseOffset = (((globalIdx * 137) % 360) * Math.PI) / 180
+        const direction = globalIdx % 2 === 0 ? 1 : -1
+        // Speeds range ~5..11 rad/s, signed.
+        const speed = (5 + ((globalIdx * 13) % 60) / 10) * direction
+        plans.push({
+          id: `e-${globalIdx}`,
+          radius,
+          tilt: [(tiltXDeg * Math.PI) / 180, 0, (tiltZDeg * Math.PI) / 180],
+          phaseOffset,
+          speed,
+          isValence,
+        })
+        globalIdx++
       }
-    })
+    }
+    return plans
   }, [el.shells])
 
   useFrame((_, delta) => {
-    for (let i = 0; i < shellRefs.current.length; i++) {
-      const ref = shellRefs.current[i]
-      const plan = shells[i]
+    for (let i = 0; i < electronRefs.current.length; i++) {
+      const ref = electronRefs.current[i]
+      const plan = electronPlans[i]
       if (!ref || !plan) continue
       ref.rotation.y += delta * plan.speed
     }
@@ -96,50 +112,52 @@ export function Atom({ Z, position, showLabel = true, scale = 1, opacity = 1 }: 
         </Billboard>
       )}
 
-      {/* Electron shells — each electron is a trail of fading, slightly-blurred
-          sprites along an arc behind its head position, suggesting motion. */}
-      {shells.map((plan, shellIndex) => {
+      {/* Per-electron orbits: each electron has its own group with its own tilt,
+          starting phase, and signed rotation speed. The trail of fading sprites
+          rides with the electron's group. */}
+      {electronPlans.map((plan, idx) => {
         const baseScale = plan.isValence ? 0.055 : 0.04
         const color = plan.isValence ? '#fff5b8' : '#ffd97a'
-        const trailSprites: Array<{
-          id: string
-          position: Vector3Tuple
-          scale: number
-          opacity: number
-        }> = []
-        for (let i = 0; i < plan.electrons; i++) {
-          const headAngle = (i / plan.electrons) * Math.PI * 2
-          for (let k = 0; k < TRAIL_LENGTH; k++) {
-            // k=0 is the head (full opacity); higher k = further behind & dimmer.
-            const angle = headAngle - (k / TRAIL_LENGTH) * TRAIL_ARC
-            const fade = 1 - k / TRAIL_LENGTH
-            trailSprites.push({
-              id: `${plan.id}-e${i}-t${k}`,
-              position: [Math.cos(angle) * plan.radius, 0, Math.sin(angle) * plan.radius],
-              // Trail sprites grow very slightly to read as motion blur.
-              scale: baseScale * (1 + k * 0.1),
-              // Opacity tapers exponentially toward the tail.
-              opacity: 0.18 + 0.82 * fade ** 1.6,
-            })
+        const trailSprites = Array.from({ length: TRAIL_LENGTH }, (_, k) => {
+          // k=0 is the head at +X on the orbital ring; higher k = behind the head.
+          const angle = -(k / TRAIL_LENGTH) * TRAIL_ARC
+          const fade = 1 - k / TRAIL_LENGTH
+          return {
+            id: `${plan.id}-t${k}`,
+            position: [
+              Math.cos(angle) * plan.radius,
+              0,
+              Math.sin(angle) * plan.radius,
+            ] as Vector3Tuple,
+            // Trail sprites grow very slightly to read as motion blur.
+            scale: baseScale * (1 + k * 0.1),
+            // Opacity tapers exponentially toward the tail.
+            opacity: 0.18 + 0.82 * fade ** 1.6,
           }
-        }
+        })
         return (
-          <group
-            key={plan.id}
-            ref={(g) => {
-              if (g) shellRefs.current[shellIndex] = g
-            }}
-            rotation={plan.tilt}
-          >
-            {trailSprites.map((s) => (
-              <ElectronSprite
-                key={s.id}
-                position={s.position}
-                scale={s.scale}
-                color={color}
-                opacity={s.opacity}
-              />
-            ))}
+          // Outer group sets the orbital plane via the tilt.
+          <group key={plan.id} rotation={plan.tilt}>
+            {/* Inner group spins around its local +Y; we mutate rotation.y in useFrame. */}
+            <group
+              ref={(g) => {
+                if (g) {
+                  electronRefs.current[idx] = g
+                  // Seed initial phase so all electrons aren't aligned at t=0.
+                  g.rotation.y = plan.phaseOffset
+                }
+              }}
+            >
+              {trailSprites.map((s) => (
+                <ElectronSprite
+                  key={s.id}
+                  position={s.position}
+                  scale={s.scale}
+                  color={color}
+                  opacity={s.opacity}
+                />
+              ))}
+            </group>
           </group>
         )
       })}
