@@ -1,0 +1,18 @@
+@import "tailwindcss";
+
+@theme {
+  --color-bg-primary: #07051a;
+  --color-bg-secondary: #0d0a22;
+  --color-ink: #dffaff;
+  --color-ink-muted: #9aa0c8;
+  --color-accent-cyan: #5cc6ff;
+  --color-accent-pink: #ec59b6;
+  --color-attach-green: #a4ff8c;
+  --color-attach-yellow: #ffd97a;
+  --color-attach-red: #ff7a7a;
+}
+
+html,
+body {
+  height: 100%;
+}
