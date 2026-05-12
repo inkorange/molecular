@@ -8,6 +8,8 @@ import { useStore } from '@/src/store'
 interface OrbitLike {
   target: Vector3
   update: () => void
+  minDistance: number
+  maxDistance: number
 }
 
 /**
@@ -47,17 +49,19 @@ export function CameraFit() {
     const sx = maxX - minX
     const sy = maxY - minY
     const sz = maxZ - minZ
-    const halfDiag = Math.sqrt(sx * sx + sy * sy + sz * sz) / 2
-    // +1.5 pads for atom visual radii + breathing room; max(_,2) keeps a single atom framed.
-    const sphereRadius = Math.max(halfDiag + 1.5, 2)
+    // Effective radius is half the LONGEST axis of the AABB plus a pad for atom
+    // visual radii. Using the space-diagonal here would over-inflate elongated
+    // molecules (e.g. glucose) and push the camera unnecessarily far away.
+    const maxAxis = Math.max(sx, sy, sz)
+    const sphereRadius = Math.max(maxAxis / 2 + 1.0, 1.5)
 
-    // Distance to fit the sphere in BOTH vertical and horizontal FOV.
     const fovV = (camera.fov * Math.PI) / 180
     const aspect = camera.aspect || 1
     const fovH = 2 * Math.atan(Math.tan(fovV / 2) * aspect)
-    const distV = sphereRadius / Math.sin(fovV / 2)
-    const distH = sphereRadius / Math.sin(fovH / 2)
-    const distance = Math.max(distV, distH) * 1.15
+    // Default framing: molecule diameter == 75% of viewport WIDTH.
+    //   2R = 0.75 * (2 * D * tan(hFov/2))  →  D = R / (0.75 * tan(hFov/2))
+    // No vertical clamp — the user can rotate to see anything that overflows top/bottom.
+    const distance = sphereRadius / (0.75 * Math.tan(fovH / 2))
 
     // Preserve current viewing direction; only reset distance and target.
     const target = controls.target.clone()
@@ -67,6 +71,15 @@ export function CameraFit() {
 
     controls.target.set(cx, cy, cz)
     camera.position.set(cx + dir.x * distance, cy + dir.y * distance, cz + dir.z * distance)
+
+    // Max zoom-out: distance at which the molecule's bounding-sphere DIAMETER
+    // fills half the screen width. Beyond this, the user would see < 50% of
+    // their viewport occupied by the molecule.
+    //   screenWidth(D) = 2 * D * tan(hFov/2)
+    //   want 2R >= 0.5 * screenWidth → D <= 2R / tan(hFov/2)
+    const maxZoomOut = (2 * sphereRadius) / Math.tan(fovH / 2)
+    // Allow a hair past the auto-fit so the initial frame isn't pinned to the wall.
+    controls.maxDistance = Math.max(maxZoomOut, distance + 1)
     controls.update()
   }, [atoms, camera, controls])
 
