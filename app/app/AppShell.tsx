@@ -179,6 +179,7 @@ export function AppShell() {
         <DrawerTrigger asChild>
           <button
             type="button"
+            aria-label={mode === 'build' ? 'Open elements palette' : 'Open molecule library'}
             className="absolute right-0 bottom-0 left-0 z-10 flex items-center justify-between gap-3 bg-[#0d0a22]/95 px-2 py-2 text-left backdrop-blur"
           >
             <ValidityBar />
