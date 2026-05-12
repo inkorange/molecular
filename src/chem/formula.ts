@@ -2,19 +2,51 @@ import { getElement } from './elements'
 import type { Atom } from './types'
 
 // Elements where, conventionally, hydrogen is written LAST when the compound contains
-// no carbon (e.g. NH3, BH3, PH3, SiH4). Without this list, strict electronegativity
-// sort would put H first (since H is less electronegative than these elements is not
-// uniformly true — but convention places H after them anyway).
+// no carbon (e.g. NH3, BH3, PH3, SiH4).
 const HYDRIDE_ELEMENTS = new Set(['B', 'N', 'P', 'Si', 'As', 'Ge', 'Sb'])
 
 /**
- * Conventional chemical formula:
- * - With carbon: C, H, then rest alphabetical (Hill system).
- * - Without carbon: elements sorted by electronegativity ascending.
- *   If H is present alongside any hydride element (B, N, P, Si, As, Ge, Sb),
- *   H is moved to the end of the formula.
+ * Compound-formula overrides for common compounds whose conventional textbook
+ * formula doesn't match algorithmic electronegativity-ordering. Keyed by the
+ * sorted "symbol1Count1symbol2Count2..." signature of the atom multiset.
  *
- * Designed to match what students see in textbooks: NH3, H2O, HCl, NaCl, BH3, SiH4.
+ * Example: NaOH = 1 Na + 1 O + 1 H → signature 'H1Na1O1' → 'NaOH'.
+ *
+ * The signature is built by sorting element symbols alphabetically (NOT the formula),
+ * then concatenating symbol + count for each.
+ */
+const COMPOUND_OVERRIDES: Record<string, string> = {
+  H1Na1O1: 'NaOH',
+  H1K1O1: 'KOH',
+  H1Ca1O2: 'Ca(OH)2', // hypothetical — but probably not built from raw atoms in v1
+  C1Ca1O3: 'CaCO3',
+  C1K1N1O3: 'KNO3', // K, then nitrate
+  C1H1Na1O3: 'NaHCO3', // sodium bicarbonate (if ever built)
+  H1Na1O3S1: 'NaHSO3', // sodium bisulfite (if ever built)
+  Cu1O4S1: 'CuSO4',
+  Fe1O4S1: 'FeSO4',
+  K1N1O3: 'KNO3',
+  Na2O4S1: 'Na2SO4',
+}
+
+function signature(counts: Map<string, number>): string {
+  return [...counts.entries()]
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([sym, n]) => `${sym}${n}`)
+    .join('')
+}
+
+/**
+ * Conventional chemical formula:
+ * - First, check the COMPOUND_OVERRIDES map by atom-count signature.
+ * - Otherwise:
+ *   - With carbon: C, H, then rest alphabetical (Hill system).
+ *   - Without carbon: elements sorted by electronegativity ascending.
+ *     If H is present alongside any hydride element (B, N, P, Si, As, Ge, Sb),
+ *     H is moved to the end.
+ *
+ * Designed to match what students see in textbooks: NH3, H2O, HCl, NaCl, BH3,
+ * SiH4, NaOH, KOH, CaCO3.
  */
 export function getFormula(atoms: readonly Atom[]): string {
   if (atoms.length === 0) return ''
@@ -26,6 +58,10 @@ export function getFormula(atoms: readonly Atom[]): string {
     counts.set(el.symbol, (counts.get(el.symbol) ?? 0) + 1)
     electronegativity.set(el.symbol, el.electronegativity)
   }
+
+  const sig = signature(counts)
+  const override = COMPOUND_OVERRIDES[sig]
+  if (override) return override
 
   const symbols = [...counts.keys()]
   const hasCarbon = counts.has('C')
@@ -41,8 +77,6 @@ export function getFormula(atoms: readonly Atom[]): string {
       if (ex === ey) return x.localeCompare(y)
       return ex - ey
     })
-    // Hydride exception: if H is present and any HYDRIDE_ELEMENTS element is present,
-    // move H to the end.
     if (ordered.includes('H') && ordered.some((s) => HYDRIDE_ELEMENTS.has(s))) {
       ordered = [...ordered.filter((s) => s !== 'H'), 'H']
     }

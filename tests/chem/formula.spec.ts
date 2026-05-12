@@ -70,4 +70,50 @@ describe('getFormula — conventional chemistry textbook output', () => {
   it('empty atom list → empty string', () => {
     expect(getFormula([])).toBe('')
   })
+
+  it('sodium hydroxide → NaOH (override map)', () => {
+    expect(getFormula([make(11), make(8), make(1)])).toBe('NaOH')
+  })
+
+  it('potassium hydroxide → KOH (override map)', () => {
+    expect(getFormula([make(19), make(8), make(1)])).toBe('KOH')
+  })
+
+  it('calcium carbonate → CaCO3 (override map)', () => {
+    expect(getFormula([make(20), make(6), make(8), make(8), make(8)])).toBe('CaCO3')
+  })
+
+  it('copper sulfate → CuSO4 (override map)', () => {
+    const atoms = [
+      make(29),
+      make(16),
+      ...Array(4)
+        .fill(0)
+        .map(() => make(8)),
+    ]
+    expect(getFormula(atoms)).toBe('CuSO4')
+  })
+
+  it('sodium sulfate → Na2SO4 (override map)', () => {
+    const atoms = [
+      make(11),
+      make(11),
+      make(16),
+      ...Array(4)
+        .fill(0)
+        .map(() => make(8)),
+    ]
+    expect(getFormula(atoms)).toBe('Na2SO4')
+  })
+
+  it('potassium nitrate → KNO3 (override map)', () => {
+    const atoms = [
+      make(19),
+      make(7),
+      ...Array(3)
+        .fill(0)
+        .map(() => make(8)),
+    ]
+    expect(getFormula(atoms)).toBe('KNO3')
+  })
 })
