@@ -1,6 +1,6 @@
 'use client'
 
-import { Billboard, Text } from '@react-three/drei'
+import { Billboard, Line, Text } from '@react-three/drei'
 import { useFrame } from '@react-three/fiber'
 import { useMemo, useRef } from 'react'
 import type { Group, Vector3Tuple } from 'three'
@@ -30,10 +30,10 @@ const NUCLEUS_RADIUS = 0.2
 const SHELL_RADIUS_BASE = 0.32
 const SHELL_RADIUS_STEP = 0.09
 const MAX_ELECTRONS_VISIBLE = 8
-// Each electron renders as a trailing arc of sprites to give the impression
-// of speed + motion blur. TRAIL_LENGTH includes the head sprite at full opacity.
-const TRAIL_LENGTH = 32
-const TRAIL_ARC = Math.PI / 3 // span of the trail in radians (60°)
+// The tail is drawn as a single continuous Line — TAIL_POINTS samples along the arc.
+// More points = smoother curve. 32 keeps it cheap and visually smooth at scene scale.
+const TAIL_POINTS = 32
+const TAIL_ARC = Math.PI / 3 // 60° behind the head
 
 export function Atom({ Z, position, showLabel = true, scale = 1, opacity = 1 }: AtomProps) {
   const el = getElement(Z)
@@ -55,8 +55,8 @@ export function Atom({ Z, position, showLabel = true, scale = 1, opacity = 1 }: 
         const tiltZDeg = ((globalIdx * 73 + 31) % 180) - 90
         const phaseOffset = (((globalIdx * 137) % 360) * Math.PI) / 180
         const direction = globalIdx % 2 === 0 ? 1 : -1
-        // Speeds range ~14..24 rad/s, signed — ~3+ revolutions per second.
-        const speed = (14 + ((globalIdx * 13) % 100) / 10) * direction
+        // Speeds range ~9..15 rad/s, signed — ~1.5..2.4 revolutions per second.
+        const speed = (9 + ((globalIdx * 13) % 60) / 10) * direction
         plans.push({
           id: `e-${globalIdx}`,
           radius,
@@ -113,54 +113,52 @@ export function Atom({ Z, position, showLabel = true, scale = 1, opacity = 1 }: 
       )}
 
       {/* Per-electron orbits: each electron has its own group with its own tilt,
-          starting phase, and signed rotation speed. The trail of fading sprites
-          rides with the electron's group. */}
+          starting phase, and signed rotation speed. The trail is a single Line
+          with per-vertex alpha — guarantees a smooth continuous streak with no
+          visible "string of beads" artifact. The head is one bright sprite. */}
       {electronPlans.map((plan, idx) => {
-        const baseScale = plan.isValence ? 0.04 : 0.03
-        const color = plan.isValence ? '#fff5b8' : '#ffd97a'
-        const trailSprites = Array.from({ length: TRAIL_LENGTH }, (_, k) => {
-          // k=0 is the head at +X on the orbital ring; higher k = behind the head.
-          const angle = -(k / TRAIL_LENGTH) * TRAIL_ARC
-          const fade = 1 - k / TRAIL_LENGTH
-          return {
-            id: `${plan.id}-t${k}`,
-            position: [
-              Math.cos(angle) * plan.radius,
-              0,
-              Math.sin(angle) * plan.radius,
-            ] as Vector3Tuple,
-            // Keep sprites larger so they overlap into a continuous streak rather
-            // than reading as individual dots. Tail still tapers — head full size,
-            // end of tail at ~45% of the head — but never small enough to expose gaps.
-            scale: baseScale * (0.45 + 0.55 * fade),
-            // The head blooms (0.85). Trail sprites are kept low enough that even
-            // with additive blending their accumulated brightness stays below the
-            // bloom threshold — so the tail reads as a faint streak, not a glow.
-            opacity: k === 0 ? 0.85 : 0.022 * fade ** 0.5,
-          }
-        })
+        const headScale = plan.isValence ? 0.04 : 0.03
+        const colorHex = plan.isValence ? '#fff5b8' : '#ffd97a'
+        const headPos: Vector3Tuple = [plan.radius, 0, 0]
+
+        // Sample TAIL_POINTS positions along the arc behind the head.
+        const tailPoints: Vector3Tuple[] = []
+        const tailColors: Array<[number, number, number]> = []
+        for (let k = 0; k < TAIL_POINTS; k++) {
+          const angle = -(k / (TAIL_POINTS - 1)) * TAIL_ARC
+          tailPoints.push([Math.cos(angle) * plan.radius, 0, Math.sin(angle) * plan.radius])
+          // Color fades from bright at the head to dark at the tail. Stored
+          // pre-multiplied so the additive Line material reads as gradient brightness.
+          const fade = 1 - k / (TAIL_POINTS - 1)
+          const intensity = 0.18 * fade ** 1.2
+          tailColors.push([intensity, intensity * 0.92, intensity * 0.55])
+        }
+
         return (
-          // Outer group sets the orbital plane via the tilt.
           <group key={plan.id} rotation={plan.tilt}>
-            {/* Inner group spins around its local +Y; we mutate rotation.y in useFrame. */}
             <group
               ref={(g) => {
                 if (g) {
                   electronRefs.current[idx] = g
-                  // Seed initial phase so all electrons aren't aligned at t=0.
                   g.rotation.y = plan.phaseOffset
                 }
               }}
             >
-              {trailSprites.map((s) => (
-                <ElectronSprite
-                  key={s.id}
-                  position={s.position}
-                  scale={s.scale}
-                  color={color}
-                  opacity={s.opacity}
-                />
-              ))}
+              {/* The trail line — continuous, no dot artifacts. */}
+              <Line
+                points={tailPoints}
+                vertexColors={tailColors}
+                lineWidth={2.2}
+                transparent
+                opacity={1}
+              />
+              {/* The head — a single bright sprite at the leading position. */}
+              <ElectronSprite
+                position={headPos}
+                scale={headScale}
+                color={colorHex}
+                opacity={0.85}
+              />
             </group>
           </group>
         )
