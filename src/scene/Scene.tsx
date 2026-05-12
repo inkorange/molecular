@@ -4,6 +4,7 @@ import { Environment, OrbitControls, Stars } from '@react-three/drei'
 import { Canvas } from '@react-three/fiber'
 import { Bloom, EffectComposer } from '@react-three/postprocessing'
 import type { ReactNode } from 'react'
+import { MotionBlur } from './MotionBlur'
 
 interface SceneProps {
   children: ReactNode
@@ -39,6 +40,7 @@ export function Scene({ children, enableBloom = true }: SceneProps) {
       {enableBloom && (
         <EffectComposer>
           <Bloom intensity={0.8} luminanceThreshold={0.2} luminanceSmoothing={0.9} mipmapBlur />
+          <MotionBlur intensity={0.3} />
         </EffectComposer>
       )}
     </Canvas>
