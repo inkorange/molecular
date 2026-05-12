@@ -18,11 +18,7 @@ const HYDRIDE_ELEMENTS = new Set(['B', 'N', 'P', 'Si', 'As', 'Ge', 'Sb'])
 const COMPOUND_OVERRIDES: Record<string, string> = {
   H1Na1O1: 'NaOH',
   H1K1O1: 'KOH',
-  H1Ca1O2: 'Ca(OH)2', // hypothetical — but probably not built from raw atoms in v1
   C1Ca1O3: 'CaCO3',
-  C1K1N1O3: 'KNO3', // K, then nitrate
-  C1H1Na1O3: 'NaHCO3', // sodium bicarbonate (if ever built)
-  H1Na1O3S1: 'NaHSO3', // sodium bisulfite (if ever built)
   Cu1O4S1: 'CuSO4',
   Fe1O4S1: 'FeSO4',
   K1N1O3: 'KNO3',
