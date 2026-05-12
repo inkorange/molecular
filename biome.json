@@ -17,7 +17,8 @@
       "!**/playwright-report",
       "!**/test-results",
       "!**/.vercel",
-      "!**/.superpowers"
+      "!**/.superpowers",
+      "!next-env.d.ts"
     ]
   },
   "formatter": {
