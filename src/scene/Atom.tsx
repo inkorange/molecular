@@ -129,10 +129,10 @@ export function Atom({ Z, position, showLabel = true, scale = 1, opacity = 1 }: 
               0,
               Math.sin(angle) * plan.radius,
             ] as Vector3Tuple,
-            // Trail sprites grow very slightly to read as motion blur.
-            scale: baseScale * (1 + k * 0.04),
-            // Smooth gradient: bright head (~0.85) blends quickly down to a steady ~10% tail.
-            opacity: 0.1 + 0.75 * fade ** 8,
+            // Comet taper: head at full size, tail shrinks to ~15% the head size.
+            scale: baseScale * (0.15 + 0.85 * fade),
+            // Bright head (~0.85) fades smoothly to near zero at the end of the tail.
+            opacity: 0.85 * fade ** 2,
           }
         })
         return (
