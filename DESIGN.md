@@ -23,7 +23,14 @@
 3. A student can **search "glucose" in the molecule library** and instantly see C₆H₁₂O₆ rotating in 3D, with its formula, common name, and a "tell me about this molecule" button.
 4. A student can **throw two H₂ at one O₂** in Lab mode and watch them react into 2 H₂O — with electron transfer/sharing visualized.
 5. The **AI tutor** can answer "why did this happen?" given the current scene state.
-6. Runs at 60 fps on a 2020 MacBook Air at full window; gracefully degrades on tablets and phones. Homepage hero hits TTI ≤ 1.5 s on Fast 4G.
+6. Runs at 30 fps on a mid-range Android phone and iPad mini, scales up to 60 fps on a 2020 MacBook Air. Homepage hero hits TTI ≤ 1.5 s on Fast 4G.
+
+### Design principles
+
+- **Mobile-first.** Most traffic will be on phones. Every screen, interaction, and asset is designed for a phone-sized viewport with touch input *first*, then widened/enriched on tablet and desktop. Desktop is an expansion of the mobile layout, not the other way around.
+- **Demonstrate by doing.** The product sells itself through its own engine — the homepage reel, the library previews, and the Lab reactions all use the same components a user interacts with. No marketing-only animations.
+- **Pedagogy is the polish.** Every visible affordance teaches something — electron shells, attach-point colors, validity bar, AI tutor — so that "playing" is "learning."
+- **No backend in v1.** Every feature must work offline once loaded except the AI tutor route.
 
 ---
 
@@ -35,7 +42,7 @@ Three top-level modes, switchable from a persistent toolbar. The 3D viewport is 
 
 The 3D viewport shows a single molecule centered (or empty on first visit). The left sidebar is the **Molecule Library** — a search field, category filters (Water & Solvents, Acids & Bases, Hydrocarbons, Salts & Ionic, Biological, Gases), and a list of curated molecules (~30–50 for v1). Click any entry → it spawns fully built in the scene, ready to inspect, rotate, and explore. The right-side **Inspector** shows the selected molecule's metadata: common name, formula, atomic composition, total electrons, common uses, and a "Tell me about this molecule" button that streams an AI explanation.
 
-Camera: mouse-drag to orbit, scroll to zoom, ⌘/⌥-drag to pan. Touch: two-finger orbit, pinch zoom, long-press for context menu.
+Camera (touch — primary): one-finger drag to orbit, pinch to zoom, two-finger drag to pan, long-press for context menu. Camera (mouse): drag to orbit, scroll to zoom, ⌘/⌥-drag to pan.
 
 ### B. Build
 
@@ -299,12 +306,27 @@ R3F components subscribe with selectors so individual atom moves don't trigger u
 
 ## 7. UI & Palette
 
-### Layout
+### Layout (mobile-first, three breakpoints)
 
-- **Sidebar (left, ~240 px)** — Molecule Library in Explore mode; Periodic Table palette in Build/Lab modes. Collapsible to 56 px on narrow screens.
-- **Viewport (center, flex)** — the 3D canvas. Bottom strip: validity bar + formula + Save / Share buttons.
-- **Inspector (right, ~280 px, collapsible)** — selection metadata + AI tutor entry point.
-- **Mobile (< 720 px)** — sidebar becomes a bottom drawer; inspector becomes a top sheet that slides over.
+**Mobile (default, < 720 px width)** — the primary layout:
+
+- The 3D viewport fills the screen
+- A **bottom drawer** (peek height ~64 px showing the validity bar + formula + mode switcher; drag up to reveal the full Library / Periodic palette / Inspector content)
+- A **top sheet** for the AI tutor that slides down on demand
+- A floating action button bottom-right for Save / Share
+- All controls sized for thumb reach; 44×44 px hit targets minimum
+
+**Tablet (720–1100 px)** — the layout widens:
+
+- Bottom drawer becomes a left sheet (slides in from the edge) that can also be pinned open at ~280 px
+- Tutor moves from top sheet to a right sheet
+- Floating action buttons move into the now-visible left sheet header
+
+**Desktop (≥ 1100 px)** — the layout expands to three persistent panels:
+
+- **Left sidebar (~240 px)** — Molecule Library in Explore mode; Periodic Table palette in Build/Lab modes
+- **Center viewport (flex)** — the 3D canvas with the validity bar / formula / Save / Share bottom strip
+- **Right inspector (~280 px, collapsible)** — selection metadata + AI tutor entry point
 
 ### Periodic Table palette
 
@@ -346,9 +368,15 @@ Two presentations of the same data:
 
 ## 8. Build Mode — Drag & Snap Interaction
 
-### Picking
+The interaction model is designed for **touch first**; mouse input maps onto the same gestures.
 
-Mouse-down on an element card in the sidebar (or in the full-table overlay). The card enters a "picked up" state (dashed outline, contents dimmed). A tile-shaped ghost attaches to the cursor.
+### Picking (touch)
+
+Tap an element card in the drawer/sidebar. The card enters a "picked up" state (dashed outline, contents dimmed). A small "holding chip" appears anchored near the user's last tap, indicating what's in-hand. Subsequent taps target the scene.
+
+### Picking (mouse — equivalent)
+
+Mouse-down on an element card. Same picked-up state on the card; a tile-shaped ghost attaches to the cursor for the duration of the drag.
 
 ### Tile → 3D atom morph
 
@@ -362,7 +390,7 @@ This is the same `<Atom>` component used everywhere, rendered at 0.7 opacity wit
 
 ### Positioning
 
-The ghost atom rides on an invisible plane through the orbit center (perpendicular to the camera ray). Holding `Shift` raises/lowers the placement plane along the Y axis.
+The ghost (or held atom) rides on an invisible plane through the orbit center (perpendicular to the camera ray). On mouse, holding `Shift` raises/lowers the placement plane along the Y axis. On touch, a vertical scrubber appears at the right edge of the viewport while holding an atom to do the same.
 
 ### Attach points
 
@@ -390,12 +418,13 @@ Dots use a gentle 1.2 s pulse loop on radius + opacity to read as alive but not 
 - **Undo / Redo** — `⌘Z` / `⇧⌘Z`.
 - **Validity bar** — live verdict ("✓ Water", "⚠ Free radical — tutor can explain", "⚠ Hypervalent — not normally stable", "⚠ Broken octet on C — fix or accept").
 
-### Touch / tablet / mobile
+### Touch summary (the primary input model)
 
-- Tap a card → element attaches to a small cursor chip
-- Tap a valence dot → atom places there; tap empty space → free-floating
+- Tap a card → element attaches to the holding chip
+- Tap a valence dot → atom places there with snap; tap empty space → free-floating
 - Long-press an atom in the scene → context menu (bond, delete, replace, "explain this atom")
-- Two-finger orbit, pinch zoom
+- One-finger drag (on empty viewport) → orbit; pinch → zoom; two-finger drag → pan
+- Drag the bottom drawer up → expand palette / inspector
 
 ---
 
@@ -472,20 +501,24 @@ No backend. No accounts. v2 adds: optional Supabase auth, server-side gallery, t
 
 ## 12. Performance & Accessibility
 
-### Performance targets
+### Performance targets (mobile-first)
 
-- 60 fps on a 2020 MacBook Air, full window, ~20 atoms in view
-- 30 fps minimum on iPad mini and mid-range Android phones
-- < 200 ms time-to-interactive after route load on a Fast 4G connection (app route)
-- Homepage hero — TTI ≤ 1.5 s on Fast 4G; static starfield + foreground render first, canvas hydrates after, reel starts on the next frame
+- **Phone (mid-range Android, iPhone 12)** — 30 fps minimum with ~10 atoms visible; homepage reel runs at slower cadence
+- **Tablet (iPad mini)** — 30 fps minimum with ~15 atoms visible
+- **Desktop (2020 MacBook Air)** — 60 fps with ~20 atoms in view
+- **Time-to-interactive** — ≤ 1.5 s on Fast 4G for the homepage; ≤ 2 s for the `/app` route
+- **Bundle budget** — ≤ 250 KB compressed for the homepage critical path (Three.js chunk lazy-split); ≤ 800 KB compressed total for the `/app` route on first load
 
 ### Levers
 
-- Instanced electron sprites (one InstancedMesh per element)
-- Per-atom electron cap at 8 visible; additional electrons collapse to a single halo sprite
+- **Device tier detection on boot** (`matchMedia('(pointer: coarse)')`, `navigator.hardwareConcurrency`, `deviceMemory`) picks a quality preset: `mobile-lite` (no bloom, ≤ 4 electrons visible per atom, halo for outer shell, reduced reel cadence), `tablet` (bloom on, ≤ 6 electrons), `desktop` (full effects, ≤ 8 electrons)
+- Instanced electron sprites (one `InstancedMesh` per element)
+- Per-atom electron cap; additional electrons collapse to a single halo sprite
 - LOD: molecules > 30 units drop to nucleus + halo
 - `frameloop="demand"` so idle inspection doesn't burn battery
 - Lazy-load `@react-three/rapier` only on entering Lab mode
+- Lazy-load the periodic-table overlay markup only on first open
+- Service worker caches the molecule library, periodic table data, and the electron sprite texture for offline second-load
 
 ### Accessibility
 
