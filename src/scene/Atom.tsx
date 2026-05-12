@@ -122,10 +122,14 @@ export function Atom({ Z, position, showLabel = true, scale = 1, opacity = 1 }: 
         const headPos: Vector3Tuple = [plan.radius, 0, 0]
 
         // Sample TAIL_POINTS positions along the arc behind the head.
+        // Rotation around Y by +δ moves points from +X toward -Z, so a trail
+        // BEHIND the moving head sits at +Z (positive angles) for positive-speed
+        // electrons, and at -Z (negative angles) for reverse-rotating ones.
+        const trailDir = plan.speed >= 0 ? 1 : -1
         const tailPoints: Vector3Tuple[] = []
         const tailColors: Array<[number, number, number]> = []
         for (let k = 0; k < TAIL_POINTS; k++) {
-          const angle = -(k / (TAIL_POINTS - 1)) * TAIL_ARC
+          const angle = trailDir * (k / (TAIL_POINTS - 1)) * TAIL_ARC
           tailPoints.push([Math.cos(angle) * plan.radius, 0, Math.sin(angle) * plan.radius])
           // Color fades from bright at the head to dark at the tail. Stored
           // pre-multiplied so the additive Line material reads as gradient brightness.
