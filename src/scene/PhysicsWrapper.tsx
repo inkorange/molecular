@@ -1,24 +1,21 @@
 'use client'
 
-import { lazy, type ReactNode, Suspense } from 'react'
+import { Physics } from '@react-three/rapier'
+import type { ReactNode } from 'react'
 import { useStore } from '@/src/store'
 
-const Physics = lazy(() => import('@react-three/rapier').then((m) => ({ default: m.Physics })))
-
 /**
- * Lazy-loads @react-three/rapier and wraps the scene in a `<Physics>` world
- * only while the user is in Lab mode. In Explore / Build the import never
- * fires, keeping the page's initial JS budget tight.
+ * Wraps the scene in a Rapier `<Physics>` world only while the user is in
+ * Lab mode. Earlier this used `lazy()` + `Suspense` so the rapier import
+ * fired on demand, but that produced a one-frame window where the Suspense
+ * fallback rendered LabMolecule (which uses `<RigidBody>`) outside any
+ * `<Physics>` context — useRapier throws. Eager import is the safer default;
+ * we can revisit code-splitting once Lab is a heavier surface.
  *
- * Gravity is zero — atoms in Lab mode drift in 3D space, only moving when
- * the user flings them.
+ * Gravity is zero — molecules drift in 3D space, only moving when flung.
  */
 export function PhysicsWrapper({ children }: { children: ReactNode }) {
   const mode = useStore((s) => s.scene.mode)
   if (mode !== 'lab') return <>{children}</>
-  return (
-    <Suspense fallback={<>{children}</>}>
-      <Physics gravity={[0, 0, 0]}>{children}</Physics>
-    </Suspense>
-  )
+  return <Physics gravity={[0, 0, 0]}>{children}</Physics>
 }
