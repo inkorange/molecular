@@ -131,8 +131,8 @@ export function Atom({ Z, position, showLabel = true, scale = 1, opacity = 1 }: 
             ] as Vector3Tuple,
             // Trail sprites grow very slightly to read as motion blur.
             scale: baseScale * (1 + k * 0.1),
-            // Cap head opacity at 50% and taper exponentially toward the tail.
-            opacity: (0.18 + 0.82 * fade ** 1.6) * 0.5,
+            // Bright opaque head (~0.85) with a sharply tapering, very faint tail (~0.05).
+            opacity: 0.04 + 0.81 * fade ** 2.0,
           }
         })
         return (
