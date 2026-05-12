@@ -150,18 +150,21 @@ export function Atom({ Z, position, showLabel = true, scale = 1, opacity = 1 }: 
 
       {/* Label */}
       {showLabel && (
-        <Billboard renderOrder={2}>
+        // Float the label well outside the atom sphere so the nucleus and bloom
+        // don't swallow it. Billboard keeps the text facing the camera as you orbit.
+        <Billboard position={[0, NUCLEUS_RADIUS + 0.32, 0]} renderOrder={3}>
           <Text
-            fontSize={0.22}
-            color="#ffffff"
+            fontSize={0.3}
+            color="#dffaff"
             anchorX="center"
             anchorY="middle"
-            outlineWidth={0.018}
+            outlineWidth={0.04}
             outlineColor="#000000"
-            outlineBlur={0.005}
+            outlineBlur={0.01}
             material-depthTest={false}
             material-depthWrite={false}
             material-transparent
+            material-toneMapped={false}
           >
             {el.symbol}
           </Text>
