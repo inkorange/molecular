@@ -32,8 +32,8 @@ const SHELL_RADIUS_STEP = 0.09
 const MAX_ELECTRONS_VISIBLE = 8
 // Each electron renders as a trailing arc of sprites to give the impression
 // of speed + motion blur. TRAIL_LENGTH includes the head sprite at full opacity.
-const TRAIL_LENGTH = 24
-const TRAIL_ARC = Math.PI / 2.5 // span of the trail in radians (72°)
+const TRAIL_LENGTH = 32
+const TRAIL_ARC = Math.PI / 3 // span of the trail in radians (60°)
 
 export function Atom({ Z, position, showLabel = true, scale = 1, opacity = 1 }: AtomProps) {
   const el = getElement(Z)
@@ -129,12 +129,14 @@ export function Atom({ Z, position, showLabel = true, scale = 1, opacity = 1 }: 
               0,
               Math.sin(angle) * plan.radius,
             ] as Vector3Tuple,
-            // Comet taper: head at full size, tail shrinks to ~10% of the head size.
-            scale: baseScale * (0.1 + 0.9 * fade ** 1.5),
+            // Keep sprites larger so they overlap into a continuous streak rather
+            // than reading as individual dots. Tail still tapers — head full size,
+            // end of tail at ~45% of the head — but never small enough to expose gaps.
+            scale: baseScale * (0.45 + 0.55 * fade),
             // The head blooms (0.85). Trail sprites are kept low enough that even
             // with additive blending their accumulated brightness stays below the
-            // bloom threshold — so the tail reads as a faint streak, not glow.
-            opacity: k === 0 ? 0.85 : 0.025 * fade ** 0.5,
+            // bloom threshold — so the tail reads as a faint streak, not a glow.
+            opacity: k === 0 ? 0.85 : 0.022 * fade ** 0.5,
           }
         })
         return (
