@@ -4,15 +4,18 @@ import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Drawer, DrawerContent, DrawerTitle, DrawerTrigger } from '@/components/ui/drawer'
 import { Sheet, SheetContent, SheetTitle, SheetTrigger } from '@/components/ui/sheet'
+import { useStore } from '@/src/store'
 import { Inspector } from '@/src/ui/Inspector'
 import { LibraryBrowser } from '@/src/ui/LibraryBrowser'
 import { ModeSwitcher } from '@/src/ui/ModeSwitcher'
+import { PeriodicSidebar } from '@/src/ui/PeriodicSidebar'
 import { ValidityBar } from '@/src/ui/ValidityBar'
 import { AppScene } from './AppScene'
 
 export function AppShell() {
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [inspectorOpen, setInspectorOpen] = useState(false)
+  const mode = useStore((s) => s.scene.mode)
 
   return (
     <div className="relative h-dvh w-screen overflow-hidden">
@@ -54,13 +57,21 @@ export function AppShell() {
             className="absolute right-0 bottom-0 left-0 z-10 flex items-center justify-between bg-[#0d0a22]/95 px-4 py-2 text-left backdrop-blur"
           >
             <ValidityBar />
-            <span className="text-xs text-[#8d92b8]">Library ↑</span>
+            <span className="text-xs text-[#8d92b8]">
+              {mode === 'build' ? 'Periodic ↑' : 'Library ↑'}
+            </span>
           </button>
         </DrawerTrigger>
         <DrawerContent className="border-[#2a2655] bg-[#0d0a22]">
-          <DrawerTitle className="sr-only">Molecule Library</DrawerTitle>
+          <DrawerTitle className="sr-only">
+            {mode === 'build' ? 'Periodic Table' : 'Molecule Library'}
+          </DrawerTitle>
           <div className="flex h-[70vh] min-h-0 flex-col overflow-hidden">
-            <LibraryBrowser onPick={() => setDrawerOpen(false)} />
+            {mode === 'build' ? (
+              <PeriodicSidebar onPick={() => setDrawerOpen(false)} />
+            ) : (
+              <LibraryBrowser onPick={() => setDrawerOpen(false)} />
+            )}
           </div>
         </DrawerContent>
       </Drawer>
