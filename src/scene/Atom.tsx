@@ -1,7 +1,7 @@
 'use client'
 
 import { Billboard, Text } from '@react-three/drei'
-import { useFrame } from '@react-three/fiber'
+import { useFrame, useThree } from '@react-three/fiber'
 import { useEffect, useMemo, useRef } from 'react'
 import {
   AdditiveBlending,
@@ -10,10 +10,30 @@ import {
   type Group,
   LineBasicMaterial,
   Line as ThreeLine,
+  Vector3,
   type Vector3Tuple,
 } from 'three'
 import { getElement } from '@/src/chem/elements'
+import type { ElementCategory } from '@/src/chem/types'
 import { ElectronSprite } from './ElectronSprite'
+
+const CATEGORY_ACCENT: Record<ElementCategory, string> = {
+  alkali: '#FF7A8C',
+  alkaline: '#FFB86B',
+  transition: '#FFD07A',
+  'other-metal': '#B0B5CC',
+  metalloid: '#7AD9AA',
+  nonmetal: '#5CC6FF',
+  halogen: '#C8FF7A',
+  noble: '#C89EFF',
+}
+
+// Periodic-table style card built out of 3D primitives — billboard-rotated to face
+// camera but rendered at its real 3D position so depth-test naturally occludes
+// cards that sit behind other atoms.
+const CARD_W = 0.58
+const CARD_H = 0.52
+const CARD_ACCENT_W = 0.05
 
 interface AtomProps {
   Z: number
@@ -72,10 +92,24 @@ function buildTrailLine(plan: ElectronPlan): ThreeLine {
   return new ThreeLine(geom, mat)
 }
 
+// Distance at which the constant-screen-size card has its base world scale.
+// Scaling = currentDistance / CARD_REFERENCE_DISTANCE keeps it visually fixed.
+// 6.67 = 5 / 0.75 → cards render 25% smaller than the 5.0 baseline.
+const CARD_REFERENCE_DISTANCE = 6.67
+
 export function Atom({ Z, position, showLabel = true, scale = 1, opacity = 1 }: AtomProps) {
   const el = getElement(Z)
   const groupRef = useRef<Group>(null)
   const electronRefs = useRef<Group[]>([])
+  const cardRef = useRef<Group>(null)
+  const cardTmp = useMemo(() => new Vector3(), [])
+
+  // Viewport-relative card sizing. The DESIGN.md breakpoints:
+  //   < 720px       → mobile (~0.56× desktop card size)
+  //   720px–1100px  → tablet (~0.75× desktop card size)
+  //   ≥ 1100px      → desktop (1× baseline)
+  const viewWidth = useThree((s) => s.size.width)
+  const cardViewportScale = viewWidth < 720 ? 0.5625 : viewWidth < 1100 ? 0.75 : 1
 
   const electronPlans: ElectronPlan[] = useMemo(() => {
     const plans: ElectronPlan[] = []
@@ -123,12 +157,21 @@ export function Atom({ Z, position, showLabel = true, scale = 1, opacity = 1 }: 
     }
   }, [trailLines])
 
-  useFrame((_, delta) => {
+  useFrame(({ camera }, delta) => {
+    // Electron orbits.
     for (let i = 0; i < electronRefs.current.length; i++) {
       const ref = electronRefs.current[i]
       const plan = electronPlans[i]
       if (!ref || !plan) continue
       ref.rotation.y += delta * plan.speed
+    }
+    // Constant-screen-size scaling on the label card: world scale proportional
+    // to camera distance so its projected pixel size stays fixed regardless of zoom.
+    // Multiply by cardViewportScale so cards shrink on tablet/mobile breakpoints.
+    if (cardRef.current) {
+      cardRef.current.getWorldPosition(cardTmp)
+      const d = camera.position.distanceTo(cardTmp)
+      cardRef.current.scale.setScalar((d / CARD_REFERENCE_DISTANCE) * cardViewportScale)
     }
   })
 
@@ -150,16 +193,64 @@ export function Atom({ Z, position, showLabel = true, scale = 1, opacity = 1 }: 
 
       {/* Label */}
       {showLabel && (
-        <Billboard>
+        // Periodic-table card rendered as 3D meshes + drei <Text>. Billboard rotates
+        // it to face camera, but its world position respects depth-testing so cards
+        // behind atoms get correctly occluded.
+        <Billboard ref={cardRef} position={[0, NUCLEUS_RADIUS + 0.22, 0]}>
+          {/* Card background */}
+          <mesh>
+            <planeGeometry args={[CARD_W, CARD_H]} />
+            <meshBasicMaterial color="#0d0a22" transparent opacity={0.88} toneMapped={false} />
+          </mesh>
+          {/* Category accent strip on the left edge */}
+          <mesh position={[-CARD_W / 2 + CARD_ACCENT_W / 2, 0, 0.001]}>
+            <planeGeometry args={[CARD_ACCENT_W, CARD_H]} />
+            <meshBasicMaterial color={CATEGORY_ACCENT[el.category]} toneMapped={false} />
+          </mesh>
+          {/* Atomic number (top-left) */}
           <Text
-            fontSize={0.22}
-            color="#ffffff"
+            position={[-CARD_W / 2 + 0.1, CARD_H / 2 - 0.06, 0.002]}
+            fontSize={0.05}
+            color="#8d92b8"
+            anchorX="left"
+            anchorY="middle"
+            material-toneMapped={false}
+          >
+            {el.Z}
+          </Text>
+          {/* Symbol (large, center) */}
+          <Text
+            position={[0, 0.04, 0.002]}
+            fontSize={0.17}
+            color="#dffaff"
             anchorX="center"
             anchorY="middle"
-            outlineWidth={0.01}
-            outlineColor="#000000"
+            fontWeight="bold"
+            material-toneMapped={false}
           >
             {el.symbol}
+          </Text>
+          {/* Name */}
+          <Text
+            position={[0, -0.13, 0.002]}
+            fontSize={0.048}
+            color="#9aa0c8"
+            anchorX="center"
+            anchorY="middle"
+            material-toneMapped={false}
+          >
+            {el.name}
+          </Text>
+          {/* Mass */}
+          <Text
+            position={[0, -0.21, 0.002]}
+            fontSize={0.042}
+            color="#6a6f95"
+            anchorX="center"
+            anchorY="middle"
+            material-toneMapped={false}
+          >
+            {el.mass.toFixed(2)}
           </Text>
         </Billboard>
       )}

@@ -1,9 +1,5 @@
-import { AppScene } from './AppScene'
+import { AppShell } from './AppShell'
 
 export default function AppPage() {
-  return (
-    <main className="h-screen w-screen">
-      <AppScene />
-    </main>
-  )
+  return <AppShell />
 }

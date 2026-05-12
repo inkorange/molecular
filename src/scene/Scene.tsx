@@ -27,11 +27,12 @@ export function Scene({ children, enableBloom = true }: SceneProps) {
       <Environment preset="night" background={false} environmentIntensity={0.45} />
       <Stars radius={50} depth={50} count={3000} factor={4} fade speed={1} />
       <OrbitControls
-        enablePan
+        makeDefault
+        enablePan={false}
         enableRotate
         enableZoom
         minDistance={2}
-        maxDistance={20}
+        maxDistance={40}
         target={[0, 0, 0]}
       />
       <group>{children}</group>
