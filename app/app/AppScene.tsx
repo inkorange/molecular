@@ -1,12 +1,14 @@
 'use client'
 
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import { getLibraryEntry } from '@/src/data/molecules'
+import { tryReact } from '@/src/lib/applyReaction'
 import { spawnLibraryEntry } from '@/src/lib/spawn'
 import { AttachPoints } from '@/src/scene/AttachPoints'
 import { CameraFit } from '@/src/scene/CameraFit'
 import { DragGhost } from '@/src/scene/DragGhost'
 import { DropCatcher } from '@/src/scene/DropCatcher'
+import { LabMolecule } from '@/src/scene/LabMolecule'
 import { Molecule } from '@/src/scene/Molecule'
 import { PhysicsWrapper } from '@/src/scene/PhysicsWrapper'
 import { Scene } from '@/src/scene/Scene'
@@ -17,6 +19,7 @@ export function AppScene() {
   const atoms = useStore((s) => s.scene.atoms)
   const bonds = useStore((s) => s.scene.bonds)
   const molecules = useStore((s) => s.scene.molecules)
+  const mode = useStore((s) => s.scene.mode)
   const addAtom = useStore((s) => s.addAtom)
   const addBond = useStore((s) => s.addBond)
   const addMolecule = useStore((s) => s.addMolecule)
@@ -35,6 +38,20 @@ export function AppScene() {
   const atomList = Object.values(atoms)
   const bondList = Object.values(bonds)
 
+  // Collision-driven react: a single collision can fire `onCollisionEnter`
+  // on both bodies simultaneously, and rapier may fire multiple times per
+  // contact across frames. Debounce so applyReaction only runs once per
+  // resolution window.
+  const reactGuard = useRef(0)
+  function onCollide() {
+    const now = performance.now()
+    if (now - reactGuard.current < 300) return
+    const reactionId = tryReact()
+    if (reactionId) reactGuard.current = now
+  }
+
+  const inLab = mode === 'lab'
+
   return (
     <Scene>
       <CameraFit />
@@ -42,6 +59,17 @@ export function AppScene() {
         {Object.values(molecules).map((m) => {
           const mAtoms = atomList.filter((a) => a.moleculeId === m.id)
           const mBonds = bondList.filter((b) => m.bondIds.includes(b.id))
+          if (inLab) {
+            return (
+              <LabMolecule
+                key={m.id}
+                moleculeId={m.id}
+                atoms={mAtoms}
+                bonds={mBonds}
+                onCollideWith={onCollide}
+              />
+            )
+          }
           return <Molecule key={m.id} atoms={mAtoms} bonds={mBonds} />
         })}
       </PhysicsWrapper>

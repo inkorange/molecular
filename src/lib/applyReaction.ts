@@ -1,4 +1,6 @@
-import type { Reaction } from '@/src/chem/reactions'
+import { getFormula } from '@/src/chem/formula'
+import { findReaction, type Reaction } from '@/src/chem/reactions'
+import type { Atom as AtomData } from '@/src/chem/types'
 import { getLibraryEntry, LIBRARY } from '@/src/data/molecules'
 import { useStore } from '@/src/store'
 import { spawnLibraryEntry } from './spawn'
@@ -41,4 +43,31 @@ export function applyReaction(reaction: Reaction, reactantMoleculeIds: string[])
     equation: `${eqL} → ${eqR}`,
     enthalpy: reaction.enthalpy,
   })
+}
+
+/**
+ * Look at all molecules currently in the scene, tally them by formula, and
+ * fire the first matching reaction in the database. Used by both the
+ * "Combine reactants" button and the physics-collision auto-react path.
+ *
+ * Returns the reaction id that fired (for telemetry / debouncing) or null.
+ */
+export function tryReact(): string | null {
+  const state = useStore.getState()
+  const counts = new Map<string, number>()
+  const mIds: string[] = []
+  for (const m of Object.values(state.scene.molecules)) {
+    const atomsInMol = m.atomIds
+      .map((id) => state.scene.atoms[id])
+      .filter((a): a is AtomData => Boolean(a))
+    if (atomsInMol.length === 0) continue
+    const formula = getFormula(atomsInMol)
+    counts.set(formula, (counts.get(formula) ?? 0) + 1)
+    mIds.push(m.id)
+  }
+  const inputs = Array.from(counts.entries()).map(([formula, count]) => ({ formula, count }))
+  const r = findReaction(inputs)
+  if (!r) return null
+  applyReaction(r, mIds)
+  return r.id
 }
