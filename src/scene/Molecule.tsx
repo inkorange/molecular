@@ -15,7 +15,7 @@ export function Molecule({ atoms, bonds }: MoleculeProps) {
   return (
     <group>
       {atoms.map((a) => (
-        <Atom key={a.id} Z={a.Z} position={a.position as [number, number, number]} />
+        <Atom key={a.id} atomId={a.id} Z={a.Z} position={a.position as [number, number, number]} />
       ))}
       {bonds.map((b) => {
         const a = byId.get(b.atomA)

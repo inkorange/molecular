@@ -58,10 +58,12 @@ export function CameraFit() {
     const fovV = (camera.fov * Math.PI) / 180
     const aspect = camera.aspect || 1
     const fovH = 2 * Math.atan(Math.tan(fovV / 2) * aspect)
-    // Default framing: molecule diameter == 75% of viewport WIDTH.
-    //   2R = 0.75 * (2 * D * tan(hFov/2))  →  D = R / (0.75 * tan(hFov/2))
-    // No vertical clamp — the user can rotate to see anything that overflows top/bottom.
-    const distance = sphereRadius / (0.75 * Math.tan(fovH / 2))
+    // Default framing: molecule diameter as a fraction of viewport WIDTH.
+    //   2R = ratio * (2 * D * tan(hFov/2))  →  D = R / (ratio * tan(hFov/2))
+    // Portrait viewports (mobile) zoom tighter — molecule fills 88% of the width.
+    // Landscape viewports use 75% so there's room for the toolbar / drawer overlays.
+    const widthRatio = aspect < 1 ? 0.88 : 0.75
+    const distance = sphereRadius / (widthRatio * Math.tan(fovH / 2))
 
     // Preserve current viewing direction; only reset distance and target.
     const target = controls.target.clone()

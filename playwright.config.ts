@@ -22,9 +22,13 @@ export default defineConfig({
     },
   ],
   webServer: {
-    command: 'pnpm dev',
+    // CI runs a production build so route compile cost is paid once upfront
+    // instead of on every first request (Turbopack dev compiles per-route on
+    // demand, which made e2e wall time balloon). Local devs keep `pnpm dev`
+    // for instant feedback while writing tests.
+    command: process.env.CI ? 'pnpm build && pnpm start' : 'pnpm dev',
     url: 'http://localhost:3000',
     reuseExistingServer: !process.env.CI,
-    timeout: 120_000,
+    timeout: 240_000,
   },
 })

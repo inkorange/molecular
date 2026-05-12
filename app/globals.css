@@ -144,3 +144,99 @@ body {
     @apply font-sans;
   }
 }
+
+/* Animated glow halo for modals.
+ * Apply `.modal-glow` to a positioned (relative/absolute/fixed) element to
+ * wrap it in a rotating, blurred conic-gradient haze. Reusable for any
+ * specialized modal that wants the "celebratory" treatment.
+ *
+ * Three layered glows counter-rotate at different speeds and use asymmetric
+ * border-radii so the rotating shapes never read as rectangles — they morph
+ * into soft drifting blobs as they spin.
+ *
+ * Layer 1 (::before)  — small, fast, sharper conic. Inset -36px.
+ * Layer 2 (::after)   — medium, counter-spin, blurrier conic. Inset -56px.
+ * Layer 3 (.modal-glow-blob child span) — large, very slow, radial gradient
+ *                       with off-center origin so it drifts like a lava lamp.
+ *                       Use as: <span class="modal-glow-blob" aria-hidden />
+ *                       as the first child inside the .modal-glow wrapper.
+ */
+@keyframes molecular-glow-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@keyframes molecular-glow-spin-reverse {
+  to {
+    transform: rotate(-360deg);
+  }
+}
+
+.modal-glow {
+  /* Apply this class to an INNER wrapper element inside the modal — never the
+     positioned shell itself, because the rotating pseudo-elements need their
+     own positioning context and stacking context, and pinning those onto a
+     `position: fixed` dialog interferes with its viewport-centered transform.
+     This wrapper takes its own `position: relative`. */
+  position: relative;
+  isolation: isolate;
+  overflow: visible;
+}
+.modal-glow::before,
+.modal-glow::after {
+  content: "";
+  position: absolute;
+  pointer-events: none;
+  z-index: -1;
+}
+.modal-glow::before {
+  inset: -36px;
+  /* Asymmetric border-radius creates a blob rather than a rounded rectangle.
+     Eight values: top-left, top-right, bottom-right, bottom-left for
+     horizontal radii, then the same four for vertical radii. */
+  border-radius: 42% 58% 38% 62% / 55% 45% 60% 40%;
+  background: conic-gradient(from 0deg, #5cc6ff, #ec59b6, #ffd97a, #5cc6ff);
+  filter: blur(34px);
+  opacity: 0.55;
+  animation: molecular-glow-spin 18s linear infinite;
+}
+.modal-glow::after {
+  inset: -56px;
+  border-radius: 60% 40% 55% 45% / 40% 60% 45% 55%;
+  background: conic-gradient(from 180deg, #ec59b6, #ffd97a, #5cc6ff, #ec59b6);
+  filter: blur(56px);
+  opacity: 0.4;
+  animation: molecular-glow-spin-reverse 30s linear infinite;
+}
+.modal-glow-blob {
+  position: absolute;
+  inset: -84px;
+  pointer-events: none;
+  z-index: -1;
+  /* Strong asymmetric radii — visibly non-circular silhouette so rotation
+     reads as a drifting blob, not a wheel. */
+  border-radius: 38% 62% 50% 50% / 65% 40% 60% 35%;
+  /* Off-center radial gradient so the brightness drifts as it spins. */
+  background: radial-gradient(
+    ellipse at 32% 58%,
+    rgba(92, 198, 255, 0.5) 0%,
+    rgba(236, 89, 182, 0.42) 32%,
+    rgba(255, 217, 122, 0.28) 58%,
+    transparent 78%
+  );
+  filter: blur(72px);
+  opacity: 0.55;
+  /* Off-center transform-origin so the blob sweeps an oval path rather than
+     rotating in place — combined with the asymmetric radius this destroys
+     the underlying rectangle shape entirely. */
+  transform-origin: 58% 42%;
+  animation: molecular-glow-spin 48s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .modal-glow::before,
+  .modal-glow::after,
+  .modal-glow-blob {
+    animation: none;
+  }
+}
