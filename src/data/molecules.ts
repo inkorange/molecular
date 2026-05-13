@@ -637,7 +637,19 @@ export const LIBRARY: LibraryMolecule[] = [
 ]
 
 const BY_ID = new Map(LIBRARY.map((m) => [m.id, m]))
+const BY_FORMULA = new Map(LIBRARY.map((m) => [m.formula, m]))
 
 export function getLibraryEntry(id: string): LibraryMolecule | undefined {
   return BY_ID.get(id)
+}
+
+/**
+ * Look up a library entry by its chemical formula (e.g. "H2O", "NaCl").
+ * Used by the Lab recipe hints to convert reactant formulas the user is
+ * missing into addable library molecules. Returns undefined if no library
+ * entry uses that formula — e.g. monatomic species like "Na" that have a
+ * symbol but no library entry; callers should treat those as un-addable.
+ */
+export function getLibraryEntryByFormula(formula: string): LibraryMolecule | undefined {
+  return BY_FORMULA.get(formula)
 }

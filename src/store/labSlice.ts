@@ -20,6 +20,10 @@ export interface LabSliceState {
      *  scene resets back to whatever the user was just working with instead
      *  of the default water. Null on first lab visit. */
     lastAddedLibId: string | null
+    /** Reaction ids the user has explicitly dismissed from the Hints panel.
+     *  Filtered out of the displayed hints. Cleared on Reset. Stored as an
+     *  array (not Set) so it serialises cleanly for future persistence. */
+    dismissedHintIds: string[]
   }
 }
 
@@ -30,12 +34,19 @@ export interface LabSliceActions {
   consumePendingReactants: (ids: string[]) => void
   clearPendingReactants: () => void
   setLastAddedLibId: (id: string) => void
+  dismissHint: (reactionId: string) => void
+  clearDismissedHints: () => void
 }
 
 export type LabSlice = LabSliceState & LabSliceActions
 
 export const createLabSlice: StateCreator<LabSlice> = (set) => ({
-  lab: { reactions: [], pendingReactantIds: [], lastAddedLibId: null },
+  lab: {
+    reactions: [],
+    pendingReactantIds: [],
+    lastAddedLibId: null,
+    dismissedHintIds: [],
+  },
   logReaction: (entry) =>
     set(
       produce<LabSlice>((s) => {
@@ -71,6 +82,20 @@ export const createLabSlice: StateCreator<LabSlice> = (set) => ({
     set(
       produce<LabSlice>((s) => {
         s.lab.lastAddedLibId = id
+      }),
+    ),
+  dismissHint: (reactionId) =>
+    set(
+      produce<LabSlice>((s) => {
+        if (!s.lab.dismissedHintIds.includes(reactionId)) {
+          s.lab.dismissedHintIds.push(reactionId)
+        }
+      }),
+    ),
+  clearDismissedHints: () =>
+    set(
+      produce<LabSlice>((s) => {
+        s.lab.dismissedHintIds = []
       }),
     ),
 })
