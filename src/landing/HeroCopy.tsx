@@ -1,3 +1,4 @@
+import { ArrowUpRight } from 'lucide-react'
 import Link from 'next/link'
 
 // Match the gameplay UI's signature pill style — chunky rounded-full,
@@ -25,13 +26,17 @@ export function HeroCopy() {
             against the bright atoms / electron trails in the background reel.
             Tailwind v4 supports text-shadow via arbitrary value. */}
         <h1
-          className="font-extrabold text-6xl text-white leading-[1.05] tracking-tight md:text-7xl lg:text-8xl"
+          className="font-extrabold text-5xl text-white leading-[1.05] tracking-tight md:text-6xl lg:text-7xl"
           style={{
             textShadow:
               '0 0 56px rgba(0, 0, 0, 1), 0 0 24px rgba(0, 0, 0, 0.95), 0 2px 8px rgba(0, 0, 0, 0.9)',
           }}
         >
-          Build the periodic <span className="text-[#5cc6ff]">table in 3D.</span>
+          Build atoms.
+          <br />
+          Form molecules.
+          <br />
+          <span className="text-[#5cc6ff]">Run reactions.</span>
         </h1>
         <p
           className="mt-6 text-[#dffaff] text-base md:text-xl"
@@ -54,7 +59,7 @@ export function HeroCopy() {
             }}
           >
             Open the Lab
-            <span className="text-base leading-none">↗</span>
+            <ArrowUpRight className="h-4 w-4" strokeWidth={2.5} />
           </Link>
           <Link href="/app?mode=explore" className={CTA_SECONDARY}>
             Browse molecules

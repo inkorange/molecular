@@ -3,7 +3,8 @@
 import { Environment, OrbitControls, Stars } from '@react-three/drei'
 import { Canvas } from '@react-three/fiber'
 import { Bloom, EffectComposer } from '@react-three/postprocessing'
-import type { ReactNode } from 'react'
+import { type ReactNode, useEffect, useState } from 'react'
+import { type DeviceTier, detectDeviceTier } from '@/src/lib/deviceTier'
 import { MotionBlur } from './MotionBlur'
 
 interface SceneProps {
@@ -17,6 +18,15 @@ interface SceneProps {
 }
 
 export function Scene({ children, enableBloom = true, interactive = true }: SceneProps) {
+  // One-shot device-tier check on mount. Bloom + motion blur cost is
+  // disproportionate on phones with ≤4 cores, so skip the entire
+  // EffectComposer on `mobile-lite`. SSR defaults to 'desktop' so the
+  // postprocessing path also runs in the production HTML preview.
+  const [tier, setTier] = useState<DeviceTier>('desktop')
+  useEffect(() => {
+    setTier(detectDeviceTier())
+  }, [])
+  const useBloom = enableBloom && tier !== 'mobile-lite'
   return (
     <Canvas
       camera={{ position: [0, 0, 6], fov: 50 }}
@@ -44,7 +54,7 @@ export function Scene({ children, enableBloom = true, interactive = true }: Scen
         />
       )}
       <group>{children}</group>
-      {enableBloom && (
+      {useBloom && (
         <EffectComposer>
           <Bloom intensity={0.8} luminanceThreshold={0.2} luminanceSmoothing={0.9} mipmapBlur />
           <MotionBlur intensity={0.3} />

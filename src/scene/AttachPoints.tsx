@@ -7,6 +7,7 @@ import { getElement } from '@/src/chem/elements'
 import { canBond } from '@/src/chem/rules'
 import { getBondingSites } from '@/src/chem/vsper'
 import { commitBond } from '@/src/lib/commitBond'
+import { useReducedMotion } from '@/src/lib/useReducedMotion'
 import { useStore } from '@/src/store'
 
 const SNAP_RANGE = 1.5
@@ -29,9 +30,13 @@ interface AttachPointProps {
 
 function AttachPoint({ plan, active, onClick }: AttachPointProps) {
   const ref = useRef<Mesh>(null)
+  const reducedMotion = useReducedMotion()
   useFrame((state) => {
     if (!ref.current) return
-    const pulse = 1 + Math.sin(state.clock.elapsedTime * 5) * 0.15
+    // Skip the breathing pulse when the user prefers reduced motion;
+    // the larger "active" scale still applies because it's a state
+    // change, not an ongoing animation.
+    const pulse = reducedMotion ? 1 : 1 + Math.sin(state.clock.elapsedTime * 5) * 0.15
     ref.current.scale.setScalar(active ? 1.6 : pulse)
   })
   return (

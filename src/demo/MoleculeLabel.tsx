@@ -3,6 +3,7 @@
 import { Html } from '@react-three/drei'
 import type { Vector3Tuple } from 'three'
 import { getLibraryEntry, type LibraryCategory } from '@/src/data/molecules'
+import { formatFormula } from '@/src/lib/formatFormula'
 
 interface MoleculeLabelProps {
   libraryId: string
@@ -55,7 +56,9 @@ export function MoleculeLabel({ libraryId, position = [0, 0, 0] }: MoleculeLabel
         className="select-none whitespace-nowrap rounded-lg border border-[#5cc6ff]/30 bg-[#0d0a22]/85 px-4 py-2 text-center font-sans backdrop-blur"
         style={{ transform: 'translateY(48px)' }}
       >
-        <div className="font-extrabold text-[#dffaff] text-sm leading-none">{entry.formula}</div>
+        <div className="font-extrabold text-[#dffaff] text-sm leading-none">
+          {formatFormula(entry.formula)}
+        </div>
         <div className="mt-0.5 text-[10px] leading-none tracking-wide" style={{ color: nameColor }}>
           {entry.name}
         </div>

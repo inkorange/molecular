@@ -134,10 +134,12 @@ export function LabToolbar() {
 
   return (
     <>
-      {/* Mobile-only hint banner — pinned below the top toolbar so it sits
-          out of the way of the right-side button column. On sm+ the hint
-          renders inline at the top of the right column instead (below). */}
-      <p className="absolute top-16 right-2 left-2 z-10 rounded-md border border-[#5cc6ff]/30 bg-[#0d0a22]/85 px-3 py-2 text-[10px] leading-snug text-[#9aa0c8] backdrop-blur sm:hidden">
+      {/* Mobile-only hint banner — anchored to the RIGHT of the vertical
+          ModeSwitcher, sitting just under the row of header action pills.
+          Left starts at ~108px (ModeSwitcher width + padding) so the
+          ModeSwitcher stays uncovered. On sm+ the hint renders inline at
+          the top of the right column instead (below). */}
+      <p className="absolute top-16 right-2 left-[108px] z-10 rounded-md border border-[#5cc6ff]/30 bg-[#0d0a22]/85 px-3 py-2 text-[10px] leading-snug text-[#9aa0c8] backdrop-blur sm:hidden">
         Add reactants, then tap <span className="font-bold text-[#5cc6ff]">Combine reactants</span>{' '}
         to run any matching reaction.
       </p>

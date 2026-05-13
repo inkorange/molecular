@@ -6,6 +6,7 @@ import Link from 'next/link'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { Group } from 'three'
 import { type Atom, atomId, type Bond, bondId, moleculeId } from '@/src/chem/types'
+import { useReducedMotion } from '@/src/lib/useReducedMotion'
 import { Molecule } from '@/src/scene/Molecule'
 import { Scene } from '@/src/scene/Scene'
 import { getReelMolecule, REEL } from './reelData'
@@ -76,6 +77,15 @@ interface ReelStageProps {
  * reel phase so molecules pop in and spin away rather than swapping
  * abruptly.
  */
+// Max mouse-tilt offsets applied to the reel molecule's rotation. Small
+// values so the tilt reads as "the model leans toward your cursor" — not
+// a full interactive orbit (that's what /app is for). On touch devices
+// the listener bails so it never competes with page scrolling.
+const TILT_YAW_MAX = Math.PI / 14 // ~13° horizontal
+const TILT_PITCH_MAX = Math.PI / 28 // ~6° vertical
+// Exponential decay rate for tilt easing — higher = snappier follow.
+const TILT_LAMBDA = 5
+
 function ReelStage({ atoms, bonds, phase, phaseStartedAt }: ReelStageProps) {
   const width = useThree((s) => s.size.width)
   const isMobile = width < 640
@@ -85,10 +95,55 @@ function ReelStage({ atoms, bonds, phase, phaseStartedAt }: ReelStageProps) {
   const baseYaw = Math.PI / 4
 
   const groupRef = useRef<Group>(null)
+  // When the OS asks for reduced motion, hold the molecule at its base
+  // scale + yaw with no per-phase tweening. The parent already pins
+  // phase to 'stable' in that mode, but skipping the useFrame work
+  // entirely also avoids any visual drift.
+  const reducedMotion = useReducedMotion()
+  // Target tilt driven by the mouse's position over the viewport, eased
+  // smoothly each frame. Mouse-only — touch events are ignored so the
+  // reel never interferes with mobile page scrolling. Stored in refs so
+  // mousemove handlers don't trigger React re-renders.
+  const targetTilt = useRef<[number, number]>([0, 0])
+  const currentTilt = useRef<[number, number]>([0, 0])
 
-  useFrame(() => {
+  useEffect(() => {
+    if (reducedMotion) return
+    function onMove(e: PointerEvent) {
+      if (e.pointerType !== 'mouse') return
+      const nx = (e.clientX / window.innerWidth) * 2 - 1
+      const ny = (e.clientY / window.innerHeight) * 2 - 1
+      targetTilt.current = [nx, ny]
+    }
+    function onLeave() {
+      targetTilt.current = [0, 0]
+    }
+    window.addEventListener('pointermove', onMove)
+    window.addEventListener('pointerleave', onLeave)
+    return () => {
+      window.removeEventListener('pointermove', onMove)
+      window.removeEventListener('pointerleave', onLeave)
+    }
+  }, [reducedMotion])
+
+  useFrame((_, delta) => {
     const g = groupRef.current
     if (!g) return
+    if (reducedMotion) {
+      g.scale.setScalar(baseScale)
+      g.rotation.set(0, baseYaw, 0)
+      return
+    }
+    // Ease the current tilt toward the target each frame. Exponential
+    // decay makes the lean feel weighty rather than tracking 1:1.
+    const k = 1 - Math.exp(-TILT_LAMBDA * delta)
+    currentTilt.current = [
+      currentTilt.current[0] + (targetTilt.current[0] - currentTilt.current[0]) * k,
+      currentTilt.current[1] + (targetTilt.current[1] - currentTilt.current[1]) * k,
+    ]
+    const yawTilt = currentTilt.current[0] * TILT_YAW_MAX
+    const pitchTilt = currentTilt.current[1] * TILT_PITCH_MAX
+
     const t = Math.min(1, (performance.now() - phaseStartedAt) / TRANSITION_MS)
     let factor = 1
     let yawOffset = 0
@@ -102,7 +157,7 @@ function ReelStage({ atoms, bonds, phase, phaseStartedAt }: ReelStageProps) {
       yawOffset = (Math.PI / 2) * (1 - factor)
     }
     g.scale.setScalar(baseScale * factor)
-    g.rotation.y = baseYaw + yawOffset
+    g.rotation.set(pitchTilt, baseYaw + yawOffset + yawTilt, 0)
   })
 
   return (
@@ -128,12 +183,22 @@ export function HomepageReel() {
   const [phaseStartedAt, setPhaseStartedAt] = useState(() => performance.now())
   const step = REEL[stepIndex] ?? REEL[0]!
   const scene = useMemo(() => buildSceneFor(step.libraryId), [step.libraryId])
+  // OS-level "reduce motion" pins the reel: hold the FIRST molecule in
+  // 'stable' phase indefinitely, no pop-in / spin-out / step advance.
+  const reducedMotion = useReducedMotion()
+  useEffect(() => {
+    if (reducedMotion) {
+      setStepIndex(0)
+      setPhase('stable')
+    }
+  }, [reducedMotion])
 
   // Phase scheduler. Each phase change registers its own timer to flip to
   // the next phase. stepIndex is intentionally in the deps so the effect
   // re-fires on every advance even when the phase happens to repeat.
   // biome-ignore lint/correctness/useExhaustiveDependencies: stepIndex re-runs the timer per step
   useEffect(() => {
+    if (reducedMotion) return
     if (phase === 'entering') {
       const t = setTimeout(() => {
         setPhase('stable')
@@ -158,7 +223,7 @@ export function HomepageReel() {
       setPhaseStartedAt(performance.now())
     }, TRANSITION_MS)
     return () => clearTimeout(t)
-  }, [phase, stepIndex, step.durationMs])
+  }, [phase, stepIndex, step.durationMs, reducedMotion])
 
   return (
     <div className="absolute inset-0 z-0">
