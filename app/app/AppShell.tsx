@@ -2,7 +2,7 @@
 
 import { ArrowUp, Share2, Sparkles } from 'lucide-react'
 import { useSearchParams } from 'next/navigation'
-import { useEffect, useState } from 'react'
+import { Suspense, useEffect, useState } from 'react'
 import { Dialog, DialogContent, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { Drawer, DrawerContent, DrawerTitle, DrawerTrigger } from '@/components/ui/drawer'
 import { Sheet, SheetContent, SheetTitle, SheetTrigger } from '@/components/ui/sheet'
@@ -34,21 +34,10 @@ export function AppShell() {
   const cancelConnecting = useStore((s) => s.cancelConnecting)
   const sceneAtoms = useStore((s) => s.scene.atoms)
   const sceneBonds = useStore((s) => s.scene.bonds)
-  const setMode = useStore((s) => s.setMode)
 
-  // Hydrate mode from ?mode=... whenever the query param changes. Uses
-  // Next.js `useSearchParams` (reactive) instead of `window.location` so
-  // client-side navigations from another route (e.g. clicking "Build" on
-  // the homepage → /app?mode=build) actually flip the mode — reading
-  // `window.location.search` directly was stale on those transitions.
-  const searchParams = useSearchParams()
-  useEffect(() => {
-    const requested = searchParams.get('mode')
-    if (requested && VALID_MODES.has(requested as Mode)) {
-      const current = useStore.getState().scene.mode
-      if (current !== requested) setMode(requested as Mode)
-    }
-  }, [searchParams, setMode])
+  // Mode hydration from ?mode= moved into <ModeFromSearchParams> below
+  // so its useSearchParams call can sit inside a Suspense boundary —
+  // Next.js requires this or the page can't statically prerender.
 
   // Write-side: any time mode changes, replace the URL's ?mode= without
   // navigating (history.replaceState avoids a Next.js route transition).
@@ -100,6 +89,11 @@ export function AppShell() {
 
   return (
     <div className="relative h-dvh w-screen overflow-hidden">
+      {/* Suspense boundary so useSearchParams inside ModeFromSearchParams
+          doesn't opt the whole page out of static prerendering. */}
+      <Suspense fallback={null}>
+        <ModeFromSearchParams />
+      </Suspense>
       {/* Full-bleed 3D scene. .scene-shift-portrait translates the canvas
           up ~8dvh on mobile portrait so the bottom Elements/Molecules
           drawer trigger + validity bar don't crop the working scene. */}
@@ -334,4 +328,23 @@ export function AppShell() {
       {mode === 'lab' && <LabToolbar />}
     </div>
   )
+}
+
+/**
+ * Hydrates the scene store's mode from the URL's `?mode=` query param.
+ * Lives in its own component so its `useSearchParams` call can sit
+ * inside a <Suspense> boundary — Next.js requires this or the page
+ * opts out of static prerendering and `pnpm build` fails.
+ */
+function ModeFromSearchParams() {
+  const searchParams = useSearchParams()
+  const setMode = useStore((s) => s.setMode)
+  useEffect(() => {
+    const requested = searchParams.get('mode')
+    if (requested && VALID_MODES.has(requested as Mode)) {
+      const current = useStore.getState().scene.mode
+      if (current !== requested) setMode(requested as Mode)
+    }
+  }, [searchParams, setMode])
+  return null
 }
