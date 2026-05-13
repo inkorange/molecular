@@ -129,7 +129,12 @@ export function DemoPlayer({ demo, initialLevel }: DemoPlayerProps) {
               reaction-type effect overlay bursts at center.
             - combine/results: render product units idle. */}
       <div className="absolute inset-0">
-        <Scene interactive={false}>
+        {/* interactive=true gives the user OrbitControls (rotate + zoom) so
+            they can inspect the molecule from any angle during ingredients
+            or results — useful for teachers pointing at specific atoms or
+            bond geometry. Pan is disabled in Scene by default; the camera
+            stays trained on the origin. */}
+        <Scene>
           <PerspectiveCamera makeDefault position={[0, 0, 7]} fov={45} />
           {step === 'ingredients' && !isTransitioning && (
             <Molecule atoms={ingredientScene.atoms} bonds={ingredientScene.bonds} />

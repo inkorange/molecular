@@ -1,3 +1,4 @@
+import { DemoShowcase } from '@/src/landing/DemoShowcase'
 import { FeatureCards } from '@/src/landing/FeatureCards'
 import { Footer } from '@/src/landing/Footer'
 import { HeroCopy } from '@/src/landing/HeroCopy'
@@ -12,6 +13,7 @@ export default function HomePage() {
         <HeroCopy />
       </section>
       <FeatureCards />
+      <DemoShowcase />
       <HowItWorks />
       <Footer />
     </>
