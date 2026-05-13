@@ -64,6 +64,12 @@ export function TutorPanel() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ sceneSummary, tier, mode, question: q }),
       })
+      if (res.status === 429) {
+        const retry = res.headers.get('retry-after')
+        const wait = retry ? ` Try again in ${retry}s.` : ''
+        appendToLast(`Rate limit reached (10 questions per minute).${wait}`)
+        return
+      }
       if (!res.ok || !res.body) {
         appendToLast('\n[Error fetching response]')
         return
