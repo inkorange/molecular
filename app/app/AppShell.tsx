@@ -205,12 +205,20 @@ export function AppShell() {
           <button
             type="button"
             onClick={async () => {
-              const scene = useStore.getState().scene
+              const state = useStore.getState()
               const [{ encodeToHash }, { serializeScene }] = await Promise.all([
                 import('@/src/lib/shareUrl'),
                 import('@/src/lib/serializeScene'),
               ])
-              const hash = encodeToHash(serializeScene(scene))
+              // Pack the scene JSON together with the user's current camera
+              // view (if we've captured one) so the recipient lands looking
+              // at the same angle / zoom the sender chose — useful for a
+              // teacher drawing attention to a specific bond or atom.
+              const payload = JSON.stringify({
+                scene: serializeScene(state.scene),
+                view: state.view.currentView,
+              })
+              const hash = encodeToHash(payload)
               const url = `${window.location.origin}/s/${hash}`
               try {
                 await navigator.clipboard.writeText(url)

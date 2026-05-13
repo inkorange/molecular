@@ -6,7 +6,9 @@ import { tryReact } from '@/src/lib/applyReaction'
 import { saveCurrent } from '@/src/lib/persistence'
 import { spawnLibraryEntry } from '@/src/lib/spawn'
 import { AttachPoints } from '@/src/scene/AttachPoints'
+import { CameraApply } from '@/src/scene/CameraApply'
 import { CameraFit } from '@/src/scene/CameraFit'
+import { CameraSync } from '@/src/scene/CameraSync'
 import { DragGhost } from '@/src/scene/DragGhost'
 import { DropCatcher } from '@/src/scene/DropCatcher'
 import { LabMolecule } from '@/src/scene/LabMolecule'
@@ -69,6 +71,12 @@ export function AppScene() {
   return (
     <Scene>
       <CameraFit />
+      {/* CameraSync: live-mirror camera + controls into the store so the
+          Share button can capture the user's current view. CameraApply: if
+          a shared URL stamped a pending view onto the store, apply it once
+          on mount and clear. */}
+      <CameraSync />
+      <CameraApply />
       <PhysicsWrapper>
         {Object.values(molecules).map((m) => {
           const mAtoms = atomList.filter((a) => a.moleculeId === m.id)

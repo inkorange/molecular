@@ -280,6 +280,12 @@ body {
   .button-glow {
     position: relative;
     isolation: isolate;
+    /* Sharp drop-shadow on the button label so it stays legible against
+     the bright gradient pills (tri-color CTA, gold→cyan Share, etc.).
+     1px y-offset + 2px blur reads as a crisp halo without softening the
+     letterforms. Text-shadow inherits, so a single rule covers all child
+     text inside any .button-glow element. */
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.7);
   }
   /* Pseudo-element keeps the button's pill silhouette (border-radius: inherit)
    * and never rotates as a shape — so the halo always hugs the button outline.
