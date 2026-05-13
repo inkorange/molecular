@@ -1,5 +1,6 @@
 'use client'
 
+import { ArrowLeft, ArrowUpRight } from 'lucide-react'
 import Link from 'next/link'
 import { useState } from 'react'
 import { DEMOS } from '@/src/data/demonstrations'
@@ -35,7 +36,29 @@ export function DemoPicker() {
   const sorted = [...DEMOS].sort((a, b) => a.difficulty - b.difficulty)
 
   return (
-    <div className="mx-auto max-w-5xl px-6 py-12 md:px-12 md:py-20">
+    <div className="mx-auto max-w-5xl px-6 pt-6 pb-12 md:px-12 md:pt-12 md:pb-20">
+      {/* Top nav — glass-pill links matching the in-app button vocabulary.
+          Home uses a translucent dark glass; Open the lab uses the bright
+          tri-color gradient to read as the primary action. */}
+      <nav className="mb-8 flex items-center justify-between">
+        <Link
+          href="/"
+          className="button-glow inline-flex min-h-[40px] items-center gap-2 rounded-full border border-[#5cc6ff]/40 bg-[#0d0a22]/80 px-5 py-1.5 font-extrabold text-[#dffaff] text-xs uppercase tracking-wider backdrop-blur transition-transform hover:scale-105 hover:border-[#5cc6ff]/70 active:scale-95"
+        >
+          <ArrowLeft className="h-4 w-4" strokeWidth={2.5} /> Home
+        </Link>
+        <Link
+          href="/app"
+          className="button-glow inline-flex min-h-[40px] items-center gap-2 rounded-full px-5 py-1.5 font-extrabold text-white text-xs uppercase tracking-wider transition-transform hover:scale-105 active:scale-95"
+          style={{
+            background: 'linear-gradient(90deg, #5cc6ff 0%, #ec59b6 50%, #ffd97a 100%)',
+          }}
+        >
+          Open the lab
+          <ArrowUpRight className="h-4 w-4" strokeWidth={2.5} />
+        </Link>
+      </nav>
+
       <header className="mb-10">
         <h1 className="mb-3 font-extrabold text-4xl text-white leading-[1.05] tracking-tight md:text-6xl">
           <span
@@ -95,17 +118,11 @@ export function DemoPicker() {
             <p className="flex-1 text-[#9aa0c8] text-sm leading-snug">{d.summary}</p>
             <span className="mt-1 inline-flex items-center gap-1 self-start font-bold text-[#5cc6ff] text-xs uppercase tracking-wider group-hover:underline">
               Play demo
-              <span className="text-sm leading-none">↗</span>
+              <ArrowUpRight className="h-4 w-4" strokeWidth={2.5} />
             </span>
           </Link>
         ))}
       </div>
-
-      <footer className="mt-12 text-[#6a6f95] text-xs">
-        <Link href="/app" className="hover:text-[#dffaff]">
-          ← Back to the lab
-        </Link>
-      </footer>
     </div>
   )
 }

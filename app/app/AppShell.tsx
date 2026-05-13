@@ -1,5 +1,7 @@
 'use client'
 
+import { ArrowUp, Share2, Sparkles } from 'lucide-react'
+import { useSearchParams } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import { Dialog, DialogContent, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { Drawer, DrawerContent, DrawerTitle, DrawerTrigger } from '@/components/ui/drawer'
@@ -34,17 +36,19 @@ export function AppShell() {
   const sceneBonds = useStore((s) => s.scene.bonds)
   const setMode = useStore((s) => s.setMode)
 
-  // Hydrate mode from ?mode=... on first mount so a refresh preserves the
-  // user's current mode. setMode is stable from Zustand so including it in
-  // deps doesn't cause additional runs.
+  // Hydrate mode from ?mode=... whenever the query param changes. Uses
+  // Next.js `useSearchParams` (reactive) instead of `window.location` so
+  // client-side navigations from another route (e.g. clicking "Build" on
+  // the homepage → /app?mode=build) actually flip the mode — reading
+  // `window.location.search` directly was stale on those transitions.
+  const searchParams = useSearchParams()
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search)
-    const requested = params.get('mode')
+    const requested = searchParams.get('mode')
     if (requested && VALID_MODES.has(requested as Mode)) {
       const current = useStore.getState().scene.mode
       if (current !== requested) setMode(requested as Mode)
     }
-  }, [setMode])
+  }, [searchParams, setMode])
 
   // Write-side: any time mode changes, replace the URL's ?mode= without
   // navigating (history.replaceState avoids a Next.js route transition).
@@ -96,15 +100,20 @@ export function AppShell() {
 
   return (
     <div className="relative h-dvh w-screen overflow-hidden">
-      {/* Full-bleed 3D scene */}
-      <div className="absolute inset-0">
+      {/* Full-bleed 3D scene. .scene-shift-portrait translates the canvas
+          up ~8dvh on mobile portrait so the bottom Elements/Molecules
+          drawer trigger + validity bar don't crop the working scene. */}
+      <div className="scene-shift-portrait absolute inset-0">
         <AppScene />
       </div>
 
-      {/* Top toolbar — mode switcher + Clear (Build/Lab only) + Info button */}
-      <header className="absolute top-0 right-0 left-0 z-10 flex items-center justify-between px-4 py-3">
+      {/* Top toolbar — mode switcher + Clear (Build/Lab only) + Info + Share.
+          The Tutor button moved out to a circular FAB at lower-left, so the
+          remaining three pills fit in a single row on mobile next to the
+          now-vertical ModeSwitcher. */}
+      <header className="absolute top-0 right-0 left-0 z-10 flex items-start justify-between gap-2 px-4 py-3 sm:items-center">
         <ModeSwitcher />
-        <div className="flex items-center gap-2">
+        <div className="flex items-center justify-end gap-1.5 sm:gap-2">
           {mode !== 'explore' && (
             <button
               type="button"
@@ -165,40 +174,6 @@ export function AppShell() {
               </div>
             </DialogContent>
           </Dialog>
-          {/* Tutor — streaming AI chat keyed to the current scene + tier + mode.
-              Distinct gold/purple gradient so it doesn't read as "another Info". */}
-          <Sheet open={tutorOpen} onOpenChange={setTutorOpen}>
-            <SheetTrigger
-              render={
-                <button
-                  type="button"
-                  className="button-glow inline-flex min-h-[40px] items-center gap-1 rounded-full px-4 py-1.5 text-xs font-extrabold uppercase tracking-wider text-white transition-transform hover:scale-105 active:scale-95"
-                  style={{ background: 'linear-gradient(135deg, #ffd97a 0%, #ec59b6 100%)' }}
-                >
-                  Tutor
-                </button>
-              }
-            />
-            <SheetContent
-              side="bottom"
-              // Inline style wins specificity against shadcn's
-              // `data-[side=bottom]:h-auto` default. Fixed + max height pin the
-              // sheet to 60vh so the chat scrolls internally instead of
-              // pushing past the viewport top when the thread grows long.
-              style={{ height: '60vh', maxHeight: '60vh' }}
-              className="flex flex-col gap-0 overflow-hidden border-[#5cc6ff]/40 bg-[#0d0a22] p-0 text-[#dffaff]"
-            >
-              <SheetTitle className="shrink-0 border-[#2a2655] border-b px-4 py-3 text-xs font-extrabold uppercase tracking-[0.25em] text-[#dffaff]">
-                Chemistry tutor
-              </SheetTitle>
-              {/* min-h-0 + flex-1 lets the TutorPanel claim the remaining
-                  height without overflowing the sheet. TutorPanel's internal
-                  message list owns the overflow-y-auto. */}
-              <div className="min-h-0 flex-1">
-                <TutorPanel />
-              </div>
-            </SheetContent>
-          </Sheet>
           {/* Share — encodes the current scene as a short URL hash and copies
               a /s/<hash> link to clipboard. Pako compresses heavily so even
               large scenes fit comfortably in a URL. */}
@@ -228,13 +203,45 @@ export function AppShell() {
               }
               setTimeout(() => setShareToast(null), 2400)
             }}
-            className="button-glow inline-flex min-h-[40px] items-center gap-1 rounded-full px-4 py-1.5 text-xs font-extrabold uppercase tracking-wider text-white transition-transform hover:scale-105 active:scale-95"
+            aria-label="Share scene"
+            className="button-glow inline-flex h-10 w-10 items-center justify-center rounded-full text-white transition-transform hover:scale-105 active:scale-95"
             style={{ background: 'linear-gradient(135deg, #a4ff8c 0%, #5cc6ff 100%)' }}
           >
-            Share
+            <Share2 className="h-4 w-4" />
           </button>
         </div>
       </header>
+
+      {/* Tutor — streaming AI chat keyed to the current scene + tier + mode.
+          Floating circular icon button at lower-left, sitting just above
+          the bottom drawer panel. Distinct gold/magenta gradient + sparkle
+          icon so it reads as "AI helper" rather than another header pill. */}
+      <Sheet open={tutorOpen} onOpenChange={setTutorOpen}>
+        <SheetTrigger
+          render={
+            <button
+              type="button"
+              aria-label="Open chemistry tutor"
+              className="button-glow absolute bottom-16 left-3 z-20 inline-flex h-12 w-12 items-center justify-center rounded-full text-white shadow-[0_4px_20px_rgba(236,89,182,0.45)] transition-transform hover:scale-110 active:scale-95"
+              style={{ background: 'linear-gradient(135deg, #ffd97a 0%, #ec59b6 100%)' }}
+            >
+              <Sparkles className="h-5 w-5" />
+            </button>
+          }
+        />
+        <SheetContent
+          side="bottom"
+          style={{ height: '60vh', maxHeight: '60vh' }}
+          className="flex flex-col gap-0 overflow-hidden border-[#5cc6ff]/40 bg-[#0d0a22] p-0 text-[#dffaff]"
+        >
+          <SheetTitle className="shrink-0 border-[#2a2655] border-b px-4 py-3 text-xs font-extrabold uppercase tracking-[0.25em] text-[#dffaff]">
+            Chemistry tutor
+          </SheetTitle>
+          <div className="min-h-0 flex-1">
+            <TutorPanel />
+          </div>
+        </SheetContent>
+      </Sheet>
 
       {/* Share toast — small confirmation pill near the top after the user
           taps Share. Auto-dismisses after a couple of seconds. */}
@@ -298,25 +305,27 @@ export function AppShell() {
               }}
             >
               {mode === 'build' ? 'Elements' : 'Molecules'}
-              <span className="text-base leading-none">↑</span>
+              <ArrowUp className="h-4 w-4" strokeWidth={2.5} />
             </span>
           </button>
         </DrawerTrigger>
-        <DrawerContent className="border-[#5cc6ff]/40 bg-transparent">
+        {/* DrawerContent carries the solid bg so the vaul drag-handle area
+            at the top reads as part of the panel. The modal-glow halo was
+            removed from this drawer — its `inset: -36px` pseudo-elements
+            were bleeding INTO the handle area on top of DrawerContent's
+            background, making the handle band look tinted/transparent. The
+            library panel is information-dense; the halo wasn't adding
+            anything and was actively competing with the molecule rows. */}
+        <DrawerContent className="border-[#5cc6ff]/40 bg-black">
           <DrawerTitle className="sr-only">
             {mode === 'build' ? 'Periodic Table' : 'Molecule Library'}
           </DrawerTitle>
-          {/* modal-glow wraps the drawer body so the rotating halo bleeds
-              above the drawer's top edge into the scene area. */}
-          <div className="modal-glow rounded-t-xl">
-            <span className="modal-glow-blob" aria-hidden />
-            <div className="relative flex h-[70vh] min-h-0 flex-col overflow-hidden rounded-t-xl bg-black/90">
-              {mode === 'build' ? (
-                <PeriodicSidebar onPick={() => setDrawerOpen(false)} />
-              ) : (
-                <LibraryBrowser onPick={() => setDrawerOpen(false)} />
-              )}
-            </div>
+          <div className="relative flex h-[70vh] min-h-0 flex-col overflow-hidden rounded-t-xl bg-black">
+            {mode === 'build' ? (
+              <PeriodicSidebar onPick={() => setDrawerOpen(false)} />
+            ) : (
+              <LibraryBrowser onPick={() => setDrawerOpen(false)} />
+            )}
           </div>
         </DrawerContent>
       </Drawer>

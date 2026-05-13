@@ -5,6 +5,7 @@ import { getFormula } from '@/src/chem/formula'
 import type { Atom, Bond, Molecule, SceneSnapshot } from '@/src/chem/types'
 import { LIBRARY } from '@/src/data/molecules'
 import { NAMED_MOLECULES } from '@/src/data/named-molecules'
+import { formatFormula } from '@/src/lib/formatFormula'
 import { useStore } from '@/src/store'
 
 interface MoleculeSummary {
@@ -85,7 +86,7 @@ export function Inspector() {
               )}
               {s.name}
             </h2>
-            <p className="mt-1 font-mono text-sm text-[#9aa0c8]">{s.formula}</p>
+            <p className="mt-1 font-mono text-sm text-[#9aa0c8]">{formatFormula(s.formula)}</p>
           </header>
           {s.description && (
             <p className="mt-2 text-sm leading-relaxed text-[#9aa0c8]">{s.description}</p>

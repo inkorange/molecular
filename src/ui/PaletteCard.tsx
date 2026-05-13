@@ -32,27 +32,39 @@ export function PaletteCard({ element, accent, onPick }: PaletteCardProps) {
       aria-pressed={isHeld}
       aria-label={`${element.name}, atomic number ${element.Z}`}
       className={cn(
-        'relative flex aspect-square min-h-[60px] flex-col justify-between rounded-md px-2 py-1.5 text-left font-mono transition-colors lg:min-h-0',
+        // aspect-square keeps card height in sync with width so big text
+        // doesn't overflow at low column counts, and the cards never get
+        // tall + empty in the middle.
+        'relative flex aspect-square flex-col justify-between overflow-hidden rounded-md px-2 py-2 text-left font-mono transition-colors',
         isHeld
           ? 'border-2 border-dashed border-[#5cc6ff] bg-transparent text-[#5cc6ff]'
-          : 'border border-[#2a2655] bg-[#181536] text-[#dffaff] hover:-translate-y-0.5 hover:shadow-md',
+          : 'border border-[#2a2655] bg-[#0d0a22]/90 text-[#dffaff] hover:-translate-y-0.5 hover:shadow-md',
       )}
       style={
         isHeld
           ? undefined
           : {
-              boxShadow: `inset 4px 0 0 ${accent}`,
-              background: `linear-gradient(90deg, ${accent}1f 0%, #181536 60%)`,
+              // Thick left-edge accent strip (5px) — matches the 3D atom
+              // card's category-bar pattern so the palette cards read as
+              // the same design language.
+              boxShadow: `inset 5px 0 0 ${accent}`,
             }
       }
     >
-      <span className="text-[8px] leading-none text-[#6a6f95] lg:text-xs">{element.Z}</span>
-      <span className="text-center text-base font-extrabold leading-none lg:text-3xl">
+      {/* Atomic number — top-left, inset past the accent strip. */}
+      <span className="pl-1.5 font-semibold text-[#9aa0c8] text-sm leading-none sm:text-base md:text-lg lg:text-sm">
+        {element.Z}
+      </span>
+      {/* Symbol — the headline of the card. Sized large enough at every
+          breakpoint that the card reads at a glance, even on mobile. */}
+      <span className="text-center font-extrabold text-3xl leading-none sm:text-4xl md:text-5xl lg:text-3xl">
         {element.symbol}
       </span>
-      <div className="flex flex-col items-center gap-0 leading-none">
-        <span className="text-center text-[7px] text-[#8d92b8] lg:text-[11px]">{element.name}</span>
-        <span className="text-center text-[7px] text-[#6a6f95] lg:text-[10px]">
+      <div className="flex flex-col items-center gap-0 leading-tight">
+        <span className="text-center font-semibold text-[#8d92b8] text-xs sm:text-sm md:text-base lg:text-xs">
+          {element.name}
+        </span>
+        <span className="text-center text-[11px] text-[#6a6f95] sm:text-xs md:text-sm lg:text-[10px]">
           {element.mass.toFixed(2)}
         </span>
       </div>

@@ -2,6 +2,7 @@
 
 import { PerspectiveCamera } from '@react-three/drei'
 import { useFrame, useThree } from '@react-three/fiber'
+import { ArrowLeft, ArrowRight } from 'lucide-react'
 import Link from 'next/link'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { PerspectiveCamera as PerspectiveCameraImpl } from 'three'
@@ -178,8 +179,11 @@ export function DemoPlayer({ demo, initialLevel }: DemoPlayerProps) {
             - transitioning: ingredient units shrink toward origin (exiting)
               while product units grow from origin (entering), plus the
               reaction-type effect overlay bursts at center.
-            - combine/results: render product units idle. */}
-      <div className="absolute inset-0">
+            - combine/results: render product units idle.
+          .scene-shift-portrait: on mobile portrait, translate the canvas
+          up ~8dvh so the bottom step bubble + step nav don't crop the
+          molecule cluster. No-op on landscape and ≥768px. */}
+      <div className="scene-shift-portrait absolute inset-0">
         {/* interactive=true gives the user OrbitControls (rotate + zoom) so
             they can inspect the molecule from any angle during ingredients
             or results — useful for teachers pointing at specific atoms or
@@ -302,7 +306,7 @@ export function DemoPlayer({ demo, initialLevel }: DemoPlayerProps) {
               background: 'linear-gradient(135deg, #5cc6ff 0%, #3a2e7a 100%)',
             }}
           >
-            ←
+            <ArrowLeft className="h-5 w-5" strokeWidth={2.5} />
           </Link>
           <div className="flex flex-col">
             <h1 className="font-extrabold text-[#dffaff] text-sm uppercase tracking-wider sm:text-base">
@@ -370,7 +374,8 @@ export function DemoPlayer({ demo, initialLevel }: DemoPlayerProps) {
               background: 'linear-gradient(90deg, #5cc6ff 0%, #3a2e7a 100%)',
             }}
           >
-            ← Back
+            <ArrowLeft className="h-4 w-4" strokeWidth={2.5} />
+            Back
           </button>
           {/* Centered step pips */}
           <div className="flex items-center gap-2">
@@ -394,7 +399,17 @@ export function DemoPlayer({ demo, initialLevel }: DemoPlayerProps) {
               background: 'linear-gradient(90deg, #5cc6ff 0%, #ec59b6 50%, #ffd97a 100%)',
             }}
           >
-            {step === 'ingredients' ? 'Combine →' : step === 'combine' ? 'Results →' : 'Done'}
+            {step === 'ingredients' ? (
+              <>
+                Combine <ArrowRight className="h-4 w-4" strokeWidth={2.5} />
+              </>
+            ) : step === 'combine' ? (
+              <>
+                Results <ArrowRight className="h-4 w-4" strokeWidth={2.5} />
+              </>
+            ) : (
+              'Done'
+            )}
           </button>
         </div>
       </footer>
@@ -432,6 +447,10 @@ function CameraAutoFit({
 }) {
   const camera = useThree((s) => s.camera) as PerspectiveCameraImpl
   const size = useThree((s) => s.size)
+  const controls = useThree(
+    (s) =>
+      s.controls as { addEventListener?: typeof EventTarget.prototype.addEventListener } | null,
+  )
   // Target distance from origin the camera should converge to. `null`
   // means "don't touch the camera this frame" (e.g. during the merge
   // transition, where we want the camera stable).
@@ -441,11 +460,29 @@ function CameraAutoFit({
   // every subsequent fit (step change, resize) tweens via useFrame so
   // the camera glides instead of popping.
   const hasFitOnce = useRef(false)
+  // Once the user pinches / scroll-zooms / drags the camera, freeze the
+  // auto-fit so subsequent step changes don't yank their zoom back to
+  // the fitted distance. They asked for it, leave it.
+  const userInteracted = useRef(false)
+
+  useEffect(() => {
+    if (!controls?.addEventListener) return
+    const onStart = () => {
+      userInteracted.current = true
+    }
+    controls.addEventListener('start', onStart as EventListener)
+    return () => {
+      const ctl = controls as {
+        removeEventListener?: typeof EventTarget.prototype.removeEventListener
+      }
+      ctl.removeEventListener?.('start', onStart as EventListener)
+    }
+  }, [controls])
 
   // Recompute the target whenever inputs change. The actual camera move
   // happens in the useFrame below — this effect only updates the target.
   useEffect(() => {
-    if (!active || points.length === 0) {
+    if (!active || points.length === 0 || userInteracted.current) {
       targetDistance.current = null
       return
     }
@@ -482,8 +519,10 @@ function CameraAutoFit({
   // Frame-by-frame exponential decay toward the target distance. Scales
   // the camera's existing position vector so it stays on its current
   // orbit ray — OrbitControls' autoRotate keeps advancing the orbit
-  // direction underneath, and we just slide along it.
+  // direction underneath, and we just slide along it. Bails when the
+  // user has interacted so manual zoom isn't fought every frame.
   useFrame((_, delta) => {
+    if (userInteracted.current) return
     const target = targetDistance.current
     if (target === null) return
     const current = camera.position.length()

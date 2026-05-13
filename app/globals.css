@@ -385,3 +385,18 @@ body {
     background-position: 200% 0%;
   }
 }
+
+/* Shift the 3D scene canvas upward on mobile portrait so bottom panels
+ * (drawer triggers, step bubbles, validity bars) don't sit on top of
+ * the content the user is actually looking at. ~8dvh of upward
+ * translation moves the visual center of the scene from 50% → ~42% of
+ * the viewport height. Used on the /app and /demo/[id] canvas wrappers.
+ *
+ * Limited to mobile-width portrait so tablets in portrait — where the
+ * footer panels are smaller relative to the canvas — keep the natural
+ * centered framing. */
+@media (orientation: portrait) and (max-width: 767px) {
+  .scene-shift-portrait {
+    transform: translateY(-8dvh);
+  }
+}

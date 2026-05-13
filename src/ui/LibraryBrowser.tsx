@@ -3,6 +3,7 @@
 import { useMemo, useState } from 'react'
 import { Input } from '@/components/ui/input'
 import { CATEGORY_LABEL, LIBRARY, LIBRARY_CATEGORIES } from '@/src/data/molecules'
+import { formatFormula } from '@/src/lib/formatFormula'
 import { spawnLibraryEntry } from '@/src/lib/spawn'
 import { useStore } from '@/src/store'
 
@@ -83,7 +84,9 @@ export function LibraryBrowser({ onPick }: { onPick?: () => void }) {
                       className="flex min-h-[44px] w-full items-baseline justify-between rounded-md border border-transparent bg-[#14112e] px-3 py-2 text-left text-sm text-[#dffaff] transition-colors hover:border-[#5cc6ff]/40 hover:bg-[#1a163a] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5cc6ff]"
                     >
                       <span className="font-medium">{m.name}</span>
-                      <span className="font-mono text-xs text-[#9aa0c8]">{m.formula}</span>
+                      <span className="font-mono text-xs text-[#9aa0c8]">
+                        {formatFormula(m.formula)}
+                      </span>
                     </button>
                   </li>
                 ))}

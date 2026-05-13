@@ -40,7 +40,7 @@ export function PeriodicSidebar({ onPick }: PeriodicSidebarProps) {
                 <span className="text-[10px] text-[#6a6f95]">{g.entries.length}</span>
               </CollapsibleTrigger>
               <CollapsibleContent>
-                <div className="grid grid-cols-4 gap-1.5 rounded-b-md bg-[#14112e]/60 p-2 lg:grid-cols-8">
+                <div className="grid grid-cols-4 gap-1.5 rounded-b-md bg-[#14112e]/60 p-2 sm:grid-cols-5 md:grid-cols-6 lg:grid-cols-8">
                   {g.entries.map((e) => (
                     <PaletteCard key={e.Z} element={e} accent={g.accent} onPick={onPick} />
                   ))}
