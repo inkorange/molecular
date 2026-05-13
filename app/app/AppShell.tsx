@@ -23,6 +23,7 @@ export function AppShell() {
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [inspectorOpen, setInspectorOpen] = useState(false)
   const [tutorOpen, setTutorOpen] = useState(false)
+  const [shareToast, setShareToast] = useState<string | null>(null)
   const mode = useStore((s) => s.scene.mode)
   const resetScene = useStore((s) => s.resetScene)
   const clearHeld = useStore((s) => s.clearHeld)
@@ -198,8 +199,44 @@ export function AppShell() {
               </div>
             </SheetContent>
           </Sheet>
+          {/* Share — encodes the current scene as a short URL hash and copies
+              a /s/<hash> link to clipboard. Pako compresses heavily so even
+              large scenes fit comfortably in a URL. */}
+          <button
+            type="button"
+            onClick={async () => {
+              const scene = useStore.getState().scene
+              const [{ encodeToHash }, { serializeScene }] = await Promise.all([
+                import('@/src/lib/shareUrl'),
+                import('@/src/lib/serializeScene'),
+              ])
+              const hash = encodeToHash(serializeScene(scene))
+              const url = `${window.location.origin}/s/${hash}`
+              try {
+                await navigator.clipboard.writeText(url)
+                setShareToast('Share link copied to clipboard')
+              } catch {
+                setShareToast(url)
+              }
+              setTimeout(() => setShareToast(null), 2400)
+            }}
+            className="button-glow inline-flex min-h-[40px] items-center gap-1 rounded-full px-4 py-1.5 text-xs font-extrabold uppercase tracking-wider text-white transition-transform hover:scale-105 active:scale-95"
+            style={{ background: 'linear-gradient(135deg, #a4ff8c 0%, #5cc6ff 100%)' }}
+          >
+            Share
+          </button>
         </div>
       </header>
+
+      {/* Share toast — small confirmation pill near the top after the user
+          taps Share. Auto-dismisses after a couple of seconds. */}
+      {shareToast && (
+        <div className="pointer-events-none absolute top-16 right-0 left-0 z-20 flex justify-center px-4">
+          <div className="pointer-events-auto max-w-[90vw] truncate rounded-full border border-[#a4ff8c]/50 bg-[#0d0a22]/95 px-4 py-2 text-[#dffaff] text-xs shadow-[0_0_18px_rgba(164,255,140,0.35)] backdrop-blur">
+            {shareToast}
+          </div>
+        </div>
+      )}
 
       {/* Connecting-mode banner — appears below the top toolbar while the user
           is picking a second atom to bond. Pink "tap another atom" when at

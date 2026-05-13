@@ -3,6 +3,7 @@
 import { useEffect, useRef } from 'react'
 import { getLibraryEntry } from '@/src/data/molecules'
 import { tryReact } from '@/src/lib/applyReaction'
+import { saveCurrent } from '@/src/lib/persistence'
 import { spawnLibraryEntry } from '@/src/lib/spawn'
 import { AttachPoints } from '@/src/scene/AttachPoints'
 import { CameraFit } from '@/src/scene/CameraFit'
@@ -39,6 +40,14 @@ export function AppScene() {
     for (const a of result.atoms) addAtom(a)
     for (const b of result.bonds) addBond(b)
   }, [addAtom, addBond, addMolecule])
+
+  // Auto-save the scene to localStorage one second after the last change.
+  // Debounced so rapid edits (drag, build, react) don't hammer setItem.
+  // Persistence is best-effort — failures are swallowed in saveCurrent.
+  useEffect(() => {
+    const t = setTimeout(() => saveCurrent({ atoms, bonds, molecules }), 1000)
+    return () => clearTimeout(t)
+  }, [atoms, bonds, molecules])
 
   const atomList = Object.values(atoms)
   const bondList = Object.values(bonds)
