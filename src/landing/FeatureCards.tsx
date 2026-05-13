@@ -1,5 +1,6 @@
 'use client'
 
+import { PerspectiveCamera } from '@react-three/drei'
 import Link from 'next/link'
 import { useMemo } from 'react'
 import { type Atom, atomId, type Bond, bondId, moleculeId } from '@/src/chem/types'
@@ -40,8 +41,16 @@ function MiniPreview({ libraryId }: { libraryId: string }) {
   if (!data) return null
   return (
     <div className="aspect-video w-full overflow-hidden rounded-lg bg-[#0a0719]">
-      <Scene enableBloom={false}>
-        <Molecule atoms={data.atoms} bonds={data.bonds} />
+      {/* interactive={false} so visitors can't zoom/rotate these tiny
+          decorative previews — keeps them looking presentation-ready and
+          stops accidental drags inside a clickable card. */}
+      <Scene enableBloom={false} interactive={false}>
+        {/* Bring the camera in close so the molecule fills the card. */}
+        <PerspectiveCamera makeDefault position={[0, 0, 3]} fov={45} />
+        {/* 45° yaw matches the hero reel — 3/4 view reads better than dead-on. */}
+        <group rotation={[0, Math.PI / 4, 0]}>
+          <Molecule atoms={data.atoms} bonds={data.bonds} />
+        </group>
       </Scene>
     </div>
   )
@@ -74,7 +83,16 @@ const CARDS = [
 export function FeatureCards() {
   return (
     <section className="px-6 py-16 md:px-12 md:py-24">
-      <h2 className="mb-8 font-bold text-2xl text-white md:text-3xl">Three ways to learn</h2>
+      <h2 className="mb-10 font-extrabold text-3xl uppercase tracking-tight md:text-5xl">
+        <span
+          className="bg-clip-text text-transparent"
+          style={{
+            backgroundImage: 'linear-gradient(90deg, #5cc6ff 0%, #ec59b6 50%, #ffd97a 100%)',
+          }}
+        >
+          Three ways to learn
+        </span>
+      </h2>
       <div className="grid gap-6 md:grid-cols-3">
         {CARDS.map((c) => (
           <Link
@@ -85,8 +103,17 @@ export function FeatureCards() {
             <MiniPreview libraryId={c.libraryId} />
             <h3 className="mt-4 font-bold text-[#dffaff] text-xl">{c.title}</h3>
             <p className="mt-2 text-[#9aa0c8] text-sm">{c.body}</p>
-            <span className="mt-3 font-semibold text-[#5cc6ff] text-xs group-hover:underline">
-              Open →
+            {/* In-card CTA pill — matches the gameplay button vocabulary so
+                the card reads as "tap to open" rather than just a label. The
+                whole card is the clickable target; this is a visual badge. */}
+            <span
+              className="button-glow mt-4 inline-flex min-h-[36px] items-center justify-center gap-2 self-start rounded-full px-4 py-1 font-extrabold text-white text-xs uppercase tracking-wider transition-transform group-hover:scale-105"
+              style={{
+                background: 'linear-gradient(90deg, #5cc6ff 0%, #ec59b6 50%, #ffd97a 100%)',
+              }}
+            >
+              Open {c.title}
+              <span className="text-sm leading-none">↗</span>
             </span>
           </Link>
         ))}
