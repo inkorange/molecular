@@ -272,6 +272,66 @@ body {
     }
   }
 
+  /* Glow halo for the demo step explanation panel.
+   *
+   * Approach borrowed from .button-glow: the glow layer keeps the
+   * panel's pill silhouette (border-radius: inherit) and never rotates
+   * as a shape. Color motion comes from sliding a wide linear gradient
+   * horizontally via background-position. This is critical for the
+   * panel because the panel is very WIDE — rotating a wide rectangle
+   * (even with asymmetric border-radius) sweeps its corners way past
+   * the panel bounds and looks like "rays shooting out". A static-
+   * silhouette layer with a sliding gradient stays hugged to the panel.
+   *
+   * Two layers: a sharper inner halo (close-in, brighter) and a softer
+   * outer halo (wider blur, dimmer) so the glow has depth without
+   * spiraling out. */
+  .panel-glow {
+    position: relative;
+    overflow: visible;
+    opacity: 1;
+    animation: modal-glow-mount 280ms ease-out;
+  }
+  .panel-glow-layer-1,
+  .panel-glow-layer-2 {
+    /* display: block so the empty spans get a layout box. Otherwise the
+     * default `display: inline` on <span> can leave them zero-sized in
+     * some browsers even with position: absolute set. */
+    display: block;
+    position: absolute;
+    border-radius: 1.5rem;
+    pointer-events: none;
+    background: linear-gradient(
+      90deg,
+      #5cc6ff 0%,
+      #ec59b6 25%,
+      #ffd97a 50%,
+      #ec59b6 75%,
+      #5cc6ff 100%
+    );
+    background-size: 200% 100%;
+    background-position: 0% 0%;
+    animation: button-glow-sweep 12s linear infinite;
+  }
+  .panel-glow-layer-1 {
+    inset: -6px;
+    filter: blur(14px);
+    opacity: 0.2;
+  }
+  .panel-glow-layer-2 {
+    inset: -12px;
+    filter: blur(26px);
+    opacity: 0.15;
+    /* Reverse + slower so the two layers don't move in lock-step. */
+    animation: button-glow-sweep 22s linear infinite reverse;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .panel-glow-layer-1,
+    .panel-glow-layer-2 {
+      animation: none;
+    }
+  }
+
   /* Tighter sibling of .modal-glow for buttons. The element holding the
    * gradient stays put (same shape as the button) — only the conic gradient's
    * angle rotates via @property. This way the blurred halo always hugs the

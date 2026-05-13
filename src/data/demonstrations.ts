@@ -42,6 +42,15 @@ export interface Demonstration {
    * combustion adds fire particles, electrolysis arcs and splits, etc.
    */
   effectKind: 'synthesis' | 'combustion' | 'decomposition' | 'neutralization' | 'displacement'
+  /**
+   * Optional environmental trigger overlay. When present, the player
+   * layers an additional visual on top of the reaction-type effect:
+   *   - 'electricity' → animated lightning bolts striking inward
+   *   - 'heat'        → (future) heat-shimmer / waving glow
+   *   - 'spark'       → (future) brief ignition flash
+   * Omit for spontaneous reactions that need no external driver.
+   */
+  energySource?: 'electricity' | 'heat' | 'spark'
   /** Ingredient layout shown in the Ingredients step. */
   ingredients: DemoIngredient[]
   /**
@@ -203,6 +212,7 @@ export const DEMOS: Demonstration[] = [
     reactionType: 'decomposition',
     difficulty: 3,
     effectKind: 'decomposition',
+    energySource: 'electricity',
     ingredients: [{ kind: 'library', libraryId: 'water', count: 2 }],
     steps: {
       ingredients: {
@@ -271,6 +281,17 @@ export const DEMOS: Demonstration[] = [
       { kind: 'atom', Z: 30, count: 1 },
       { kind: 'library', libraryId: 'hydrochloric-acid', count: 2 },
     ],
+    // Engine reaction is Zn + 2 HCl → ZnCl₂ + H₂. ZnCl₂ isn't in the
+    // library, so the auto-derived products would only show H₂ — making
+    // it look like the Zn and Cl vanished into thin air. Explicitly
+    // render the displaced atoms as standalone Zn + 2 Cl alongside the
+    // H₂ gas so conservation of mass is visible (every atom in is an
+    // atom out, just rearranged).
+    products: [
+      { kind: 'library', libraryId: 'hydrogen-gas', count: 1 },
+      { kind: 'atom', Z: 30, count: 1 },
+      { kind: 'atom', Z: 17, count: 2 },
+    ],
     steps: {
       ingredients: {
         elementary:
@@ -289,6 +310,246 @@ export const DEMOS: Demonstration[] = [
           'Zinc chloride and hydrogen gas bubbles. This is how a chemistry class often makes hydrogen — the bubbles you see rising in beakers.',
         advanced:
           'Zn + 2 HCl → ZnCl₂ + H₂. A classic single-displacement redox reaction. Used industrially to galvanise iron and as a lab-bench hydrogen source.',
+      },
+    },
+  },
+  {
+    id: 'h2-from-h-atoms',
+    title: 'Atoms pair up',
+    summary: 'Two lonely hydrogen atoms find each other and form a bond.',
+    reactionId: 'h2-synthesis-from-h',
+    reactionType: 'synthesis',
+    difficulty: 1,
+    effectKind: 'synthesis',
+    ingredients: [{ kind: 'atom', Z: 1, count: 2 }],
+    steps: {
+      ingredients: {
+        elementary:
+          'Two single hydrogen atoms, floating apart. Hydrogen really does not like being alone — it wants a buddy.',
+        advanced:
+          'Reactants: 2 H atoms (radicals). Each has one unpaired electron, so they pair up almost instantly when they meet.',
+      },
+      combine: {
+        elementary:
+          'Snap! The two atoms grab each other and share electrons — that is what a chemical bond is.',
+        advanced:
+          'The two H· radicals overlap 1s orbitals and form a sigma (σ) covalent bond. The shared electron pair stabilises both atoms.',
+      },
+      results: {
+        elementary:
+          'We made an H₂ molecule — hydrogen gas. This is the simplest possible chemical bond, and it is how almost every other reaction starts: atoms looking for partners.',
+        advanced:
+          '2 H → H₂. ΔH ≈ −436 kJ/mol — extremely exothermic. The H–H bond energy sets the baseline against which most bond-strength tables are measured.',
+      },
+    },
+  },
+  {
+    id: 'co2-from-c',
+    title: 'Burning carbon',
+    summary: 'A piece of carbon catches fire and becomes the gas you exhale.',
+    reactionId: 'co2-from-c',
+    reactionType: 'combustion',
+    difficulty: 2,
+    effectKind: 'combustion',
+    ingredients: [
+      { kind: 'atom', Z: 6, count: 1 },
+      { kind: 'library', libraryId: 'oxygen-gas', count: 1 },
+    ],
+    steps: {
+      ingredients: {
+        elementary:
+          'One carbon atom (think charcoal) and one oxygen molecule. The carbon is about to catch fire.',
+        advanced:
+          'Reactants: C (s) and O₂ (g). Solid carbon is the simplest fuel — pure element, no other atoms to manage.',
+      },
+      combine: {
+        elementary:
+          "Flames! The carbon snaps to both oxygens. We've made carbon dioxide — the same gas you breathe out.",
+        advanced:
+          'C + O₂ → CO₂. Two new C=O double bonds form, releasing the lattice energy of solid carbon. The reaction is the basis of every charcoal grill and every breath you take.',
+      },
+      results: {
+        elementary:
+          'Carbon dioxide (CO₂). Plants drink it in, we breathe it out. Too much of it in the air is what is making the planet warmer.',
+        advanced:
+          'C + O₂ → CO₂. ΔH ≈ −394 kJ/mol — strongly exothermic. The principal product of complete combustion of any carbon-containing fuel.',
+      },
+    },
+  },
+  {
+    id: 'mgo-synthesis',
+    title: 'Burning magnesium',
+    summary: 'Magnesium ribbon ignites with a brilliant white flash.',
+    reactionId: 'mgo-synthesis',
+    reactionType: 'synthesis',
+    difficulty: 2,
+    effectKind: 'combustion',
+    ingredients: [
+      { kind: 'atom', Z: 12, count: 2 },
+      { kind: 'library', libraryId: 'oxygen-gas', count: 1 },
+    ],
+    // MgO isn't in the library — render product as separate Mg + O atoms,
+    // ionically associated but visually independent (same approach as
+    // nacl-synthesis).
+    products: [
+      { kind: 'atom', Z: 12, count: 2 },
+      { kind: 'atom', Z: 8, count: 2 },
+    ],
+    steps: {
+      ingredients: {
+        elementary:
+          'Two magnesium atoms (a metal that loves to burn) and one oxygen molecule. Watch out — this gets bright!',
+        advanced:
+          'Reactants: 2 Mg (s) and O₂ (g). Magnesium has two valence electrons it readily donates; oxygen needs two more to complete its octet.',
+      },
+      combine: {
+        elementary:
+          'FLASH! Each magnesium gives both of its electrons to an oxygen. The bright white light is how we know this is happening.',
+        advanced:
+          'Each Mg → Mg²⁺ + 2 e⁻ (oxidation); each O + 2 e⁻ → O²⁻ (reduction). The intense incandescent light is the high-temperature emission spectrum of the Mg²⁺ ions and hot MgO solid.',
+      },
+      results: {
+        elementary:
+          'Magnesium oxide — a white powder. The flash from this reaction was once used in old camera flashbulbs, and it is still used in fireworks.',
+        advanced:
+          '2 Mg + O₂ → 2 MgO. ΔH ≈ −602 kJ/mol per MgO — strongly exothermic, with an extreme adiabatic flame temperature (~3000 K). The bond is fully ionic between Mg²⁺ and O²⁻.',
+      },
+    },
+  },
+  {
+    id: 'ethanol-combustion',
+    title: 'Burning alcohol',
+    summary: 'Ethanol (drinking alcohol) burns cleanly into water and CO₂.',
+    reactionId: 'ethanol-combustion',
+    reactionType: 'combustion',
+    difficulty: 4,
+    effectKind: 'combustion',
+    ingredients: [
+      { kind: 'library', libraryId: 'ethanol', count: 1 },
+      { kind: 'library', libraryId: 'oxygen-gas', count: 3 },
+    ],
+    steps: {
+      ingredients: {
+        elementary:
+          'One ethanol molecule (the alcohol in hand sanitizer) and three oxygens. Ethanol is bigger than methane, so it needs more oxygen to burn.',
+        advanced:
+          'Reactants: C₂H₆O (l) and 3 O₂ (g). Ethanol has 2 carbons and an –OH group; complete combustion requires 3 mol O₂ per mol ethanol.',
+      },
+      combine: {
+        elementary:
+          'The ethanol breaks apart. Each carbon grabs two oxygens, the hydrogens grab the rest, and a quiet blue flame burns the whole thing up.',
+        advanced:
+          'All C–C, C–H, and C–O bonds break; new C=O and O–H bonds form. The blue flame indicates complete combustion at higher temperatures than yellow sooty flames.',
+      },
+      results: {
+        elementary:
+          'Two carbon dioxides and three waters. This is how cars that run on E85 fuel and old-fashioned alcohol lamps work — burn ethanol, get heat.',
+        advanced:
+          'C₂H₆O + 3 O₂ → 2 CO₂ + 3 H₂O. ΔH ≈ −1367 kJ/mol — strongly exothermic. The basis of ethanol fuel and the spirit lamps used in chemistry labs.',
+      },
+    },
+  },
+  {
+    id: 'mg-hcl',
+    title: 'Magnesium fizzes in acid',
+    summary: 'A magnesium ribbon dropped into HCl bubbles vigorously.',
+    reactionId: 'mg-hcl',
+    reactionType: 'displacement',
+    difficulty: 3,
+    effectKind: 'displacement',
+    ingredients: [
+      { kind: 'atom', Z: 12, count: 1 },
+      { kind: 'library', libraryId: 'hydrochloric-acid', count: 2 },
+    ],
+    // MgCl₂ isn't in the library — same trick as zn-hcl, render the
+    // displaced atoms as standalone Mg + 2 Cl alongside the H₂ gas so
+    // mass-conservation reads correctly.
+    products: [
+      { kind: 'library', libraryId: 'hydrogen-gas', count: 1 },
+      { kind: 'atom', Z: 12, count: 1 },
+      { kind: 'atom', Z: 17, count: 2 },
+    ],
+    steps: {
+      ingredients: {
+        elementary:
+          'A magnesium atom and two hydrochloric acid molecules. Magnesium is even more reactive than zinc — this will fizz hard.',
+        advanced:
+          'Reactants: Mg (s) and 2 HCl (aq). Magnesium sits well above hydrogen on the activity series; this is a textbook single-displacement redox.',
+      },
+      combine: {
+        elementary:
+          'Mg pushes hydrogen out of the way and takes its place. Hydrogen gas comes bubbling out fast.',
+        advanced:
+          'Mg(s) → Mg²⁺(aq) + 2 e⁻; 2 H⁺(aq) + 2 e⁻ → H₂(g). The Mg²⁺ pairs ionically with two Cl⁻ to form aqueous MgCl₂.',
+      },
+      results: {
+        elementary:
+          'Magnesium chloride dissolved in water plus hydrogen gas. The reaction is so fast you can light the hydrogen bubbles on fire as they leave the test tube.',
+        advanced:
+          'Mg + 2 HCl → MgCl₂ + H₂. Faster than the Zn + HCl analogue because Mg has lower ionisation energy. Used in undergraduate labs to demonstrate the activity series.',
+      },
+    },
+  },
+  {
+    id: 'nh3-decomp',
+    title: 'Unmaking ammonia',
+    summary: 'High heat splits ammonia back into nitrogen and hydrogen.',
+    reactionId: 'nh3-decomp',
+    reactionType: 'decomposition',
+    difficulty: 3,
+    effectKind: 'decomposition',
+    ingredients: [{ kind: 'library', libraryId: 'ammonia', count: 2 }],
+    steps: {
+      ingredients: {
+        elementary:
+          'Two ammonia molecules (NH₃). With enough heat, we can rip them apart — the exact reverse of how we made them.',
+        advanced:
+          'Reactants: 2 NH₃ (g). The exact reverse of the Haber process. Endothermic — requires external heat to break the N–H bonds.',
+      },
+      combine: {
+        elementary:
+          'The nitrogens find each other and pair up. The hydrogens pair up in groups of two.',
+        advanced:
+          'All N–H bonds break; new N≡N triple bond forms (very stable, releasing some of the energy back) and 3 new H–H bonds form. Net energy in.',
+      },
+      results: {
+        elementary:
+          'One nitrogen molecule (N₂) and three hydrogen molecules (H₂). All the atoms are still here — they just rearranged.',
+        advanced:
+          '2 NH₃ → N₂ + 3 H₂. ΔH ≈ +92 kJ/mol — endothermic. Occurs naturally at high temperatures (e.g. inside burning rockets) and industrially when cracking ammonia for hydrogen-fuel applications.',
+      },
+    },
+  },
+  {
+    id: 'propane-combustion',
+    title: 'Burning BBQ propane',
+    summary: 'The fuel in propane tanks burns explosively in oxygen.',
+    reactionId: 'propane-combustion',
+    reactionType: 'combustion',
+    difficulty: 4,
+    effectKind: 'combustion',
+    ingredients: [
+      { kind: 'library', libraryId: 'propane', count: 1 },
+      { kind: 'library', libraryId: 'oxygen-gas', count: 5 },
+    ],
+    steps: {
+      ingredients: {
+        elementary:
+          'One propane molecule (C₃H₈, the gas in BBQ tanks) and FIVE oxygens. It takes a lot of oxygen to burn this much fuel.',
+        advanced:
+          'Reactants: C₃H₈ (g) and 5 O₂ (g). The 1:5 fuel-to-air ratio is why propane combustion requires good ventilation; running it lean produces soot and CO.',
+      },
+      combine: {
+        elementary:
+          'BOOM! All eight C–H bonds break, the carbons grab oxygens, the hydrogens grab oxygens. The propane is gone — only CO₂ and water are left.',
+        advanced:
+          'The C–H and C–C bonds break; the C–O and O–H bonds reform. Per molecule of propane: 3 CO₂ and 4 H₂O. Burns hotter than methane per mole.',
+      },
+      results: {
+        elementary:
+          'Three carbon dioxides and four waters. Same as natural gas — just bigger. Propane is what people use for off-grid heating, BBQs, and outdoor torches.',
+        advanced:
+          'C₃H₈ + 5 O₂ → 3 CO₂ + 4 H₂O. ΔH ≈ −2220 kJ/mol — more energy per mole than methane combustion. Standard fuel for portable heating and forklift engines.',
       },
     },
   },

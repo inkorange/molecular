@@ -17,6 +17,17 @@ interface AnimatedMoleculeProps {
   phaseStartedAt: number
   /** Phase duration in ms. */
   durationMs: number
+  /**
+   * Target transform for the `entering` phase. The unit grows from
+   * (origin, scale 0) to (targetPosition, targetScale). When undefined,
+   * the unit grows into its atoms' natural centroid at scale 1 (legacy
+   * behaviour used by demos with no explicit product layout).
+   *
+   * Only consulted in the `entering` phase. Exit + idle phases continue
+   * to operate on the atoms' absolute world positions.
+   */
+  targetPosition?: [number, number, number]
+  targetScale?: number
 }
 
 function easeInCubic(t: number) {
@@ -45,6 +56,8 @@ export function AnimatedMolecule({
   phase,
   phaseStartedAt,
   durationMs,
+  targetPosition,
+  targetScale,
 }: AnimatedMoleculeProps) {
   const groupRef = useRef<Group>(null)
 
@@ -86,9 +99,19 @@ export function AnimatedMolecule({
     }
     // entering
     const k = easeOutCubic(t)
+    if (targetPosition !== undefined && targetScale !== undefined) {
+      // Atoms are LOCAL (pre-translated around 0,0,0). Group tweens from
+      // (origin, scale 0) to (targetPosition, targetScale) so the unit
+      // grows in place AT its final layout slot — no jump on transition end.
+      const s = Math.max(0.001, targetScale * k)
+      g.scale.setScalar(s)
+      g.position.set(targetPosition[0] * k, targetPosition[1] * k, targetPosition[2] * k)
+      return
+    }
+    // Legacy: atoms are WORLD (at their natural row positions). Group
+    // tweens from -centroid (atoms at origin) to 0 (atoms at natural
+    // positions), scaling 0 → 1.
     g.scale.setScalar(Math.max(0.001, k))
-    // Inverse of the exit drift: start at -centroid (i.e. atoms appear at
-    // origin) and slide outward to their natural positions.
     g.position.set(-centroid[0] * (1 - k), -centroid[1] * (1 - k), -centroid[2] * (1 - k))
   })
 

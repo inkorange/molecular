@@ -1,15 +1,20 @@
 'use client'
 
 import { PerspectiveCamera } from '@react-three/drei'
+import { useFrame, useThree } from '@react-three/fiber'
 import Link from 'next/link'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import type { PerspectiveCamera as PerspectiveCameraImpl } from 'three'
 import type { Atom as AtomData, Bond as BondData } from '@/src/chem/types'
 import type { Demonstration } from '@/src/data/demonstrations'
 import { Molecule } from '@/src/scene/Molecule'
 import { Scene } from '@/src/scene/Scene'
 import { AnimatedMolecule } from './AnimatedMolecule'
-import { buildIngredientScene, buildProductScene, getReactionMetadata } from './buildDemoScene'
+import { buildIngredientScene, buildProductLayout, getReactionMetadata } from './buildDemoScene'
+import { LightningEffect } from './LightningEffect'
+import { MoleculeLabel } from './MoleculeLabel'
 import { ReactionEffect } from './ReactionEffect'
+import { TransitionFlash } from './TransitionFlash'
 
 type Level = 'elementary' | 'advanced'
 type Step = 'ingredients' | 'combine' | 'results'
@@ -25,6 +30,33 @@ const STEP_LABEL: Record<Step, string> = {
 // Length of the ingredients→combine transition. Long enough for the
 // merge motion and effect burst to read clearly without dragging.
 const TRANSITION_MS = 1400
+// OrbitControls autoRotateSpeed (drei units — speed=2.0 → ~30s per
+// revolution at 60fps). 0.6 gives ~100s per revolution, slow enough to
+// read as a calm museum turntable rather than a spin.
+const RESULTS_AUTO_ROTATE_SPEED = 0.6
+// Constant tilt applied to the result group. ~20° forward on X tips the
+// top of the cluster TOWARD the camera — gives a 3/4 inspection angle
+// instead of a flat orthogonal view.
+const RESULTS_TILT_RAD = Math.PI / 9
+// Padding multiplier when fitting the bounding sphere into the viewport.
+// The bounding sphere is the worst-case across orbit angles, so 0.92
+// actively undershoots it — outer atoms occasionally graze the edge at
+// the widest rotation, which reads as "well-framed" rather than empty.
+const FIT_PADDING = 0.92
+// Effective "radius" added to each atom position when building the
+// bounding sphere. Atom shells render at ~0.5 units; 0.5 is enough to
+// keep them on-screen without padding bond stubs that are usually well
+// inside the sphere already.
+const ATOM_FIT_RADIUS = 0.5
+// Exponential decay rate for the camera-distance tween. Higher = faster
+// snap toward target. 3.5 closes ~97% of the gap in 1 second — fast
+// enough to feel responsive, slow enough to read as a smooth dolly.
+const ZOOM_LAMBDA = 3.5
+// Stable reference for the camera's initial position. Inline array
+// literals create a new array each render, which makes R3F think the
+// prop changed and re-apply camera.position every render — fighting the
+// auto-fit tween. The constant keeps reference equality stable.
+const INITIAL_CAMERA_POSITION: [number, number, number] = [0, 0, 8]
 
 const REACTION_TYPE_COLOR: Record<string, string> = {
   synthesis: '#5cc6ff',
@@ -57,18 +89,37 @@ export function DemoPlayer({ demo, initialLevel }: DemoPlayerProps) {
 
   const reaction = useMemo(() => getReactionMetadata(demo.reactionId), [demo.reactionId])
   const ingredientScene = useMemo(() => buildIngredientScene(demo.ingredients), [demo.ingredients])
-  const productScene = useMemo(() => buildProductScene(demo), [demo])
+  // Per-unit layout used by BOTH the transition's entering animation and
+  // the static results step. Each unit carries its final targetPosition +
+  // scale so the animation lands at the same coordinates the static
+  // render uses — no jump at transition end.
+  const productLayout = useMemo(() => buildProductLayout(demo), [demo])
 
-  // Group atoms by moleculeId so each unit can animate independently
-  // (e.g. each H₂ molecule shrinks toward origin on its own).
+  // Group atoms by moleculeId so each ingredient unit can animate
+  // independently (e.g. each H₂ molecule shrinks toward origin on its own).
   const ingredientUnits = useMemo(
     () => groupByMolecule(ingredientScene.atoms, ingredientScene.bonds),
     [ingredientScene],
   )
-  const productUnits = useMemo(
-    () => groupByMolecule(productScene.atoms, productScene.bonds),
-    [productScene],
+
+  // Worldspace points for the camera auto-fit. Ingredients scene atoms
+  // are already in worldspace; product layout atoms are LOCAL to each
+  // unit's targetPosition+scale, so flatten them here.
+  const ingredientPoints = useMemo(
+    () => ingredientScene.atoms.map((a) => a.position),
+    [ingredientScene],
   )
+  const productPoints = useMemo(() => {
+    const pts: Array<[number, number, number]> = []
+    for (const unit of productLayout) {
+      const [tx, ty, tz] = unit.targetPosition
+      const s = unit.scale
+      for (const a of unit.atoms) {
+        pts.push([tx + a.position[0] * s, ty + a.position[1] * s, tz + a.position[2] * s])
+      }
+    }
+    return pts
+  }, [productLayout])
 
   const isTransitioning = transitionStartedAt !== null
   const stepIndex = STEP_ORDER.indexOf(step)
@@ -135,9 +186,32 @@ export function DemoPlayer({ demo, initialLevel }: DemoPlayerProps) {
             bond geometry. Pan is disabled in Scene by default; the camera
             stays trained on the origin. */}
         <Scene>
-          <PerspectiveCamera makeDefault position={[0, 0, 7]} fov={45} />
+          {/* Pulled back to z=8 (was 7) so 4-unit ingredient rows like
+              ammonia synthesis (3 H₂ + N₂) fit without cropping at the
+              new 2.6-unit ingredient spacing. */}
+          <PerspectiveCamera makeDefault position={INITIAL_CAMERA_POSITION} fov={45} />
+          {/* Auto-fit camera distance to the visible scene contents. Switches
+              between the ingredient and product point sets based on step so
+              both layouts are framed correctly. Skipped during the transition
+              — the merge animation looks best with a stable camera. */}
+          <CameraAutoFit
+            points={step === 'ingredients' ? ingredientPoints : productPoints}
+            active={!isTransitioning}
+          />
           {step === 'ingredients' && !isTransitioning && (
-            <Molecule atoms={ingredientScene.atoms} bonds={ingredientScene.bonds} />
+            <>
+              <Molecule atoms={ingredientScene.atoms} bonds={ingredientScene.bonds} />
+              {/* Library-unit labels — one card per ingredient, anchored
+                  above the unit's spawn slot. Bare-atom ingredients are
+                  already labelled by `<Atom>`'s element card. */}
+              {ingredientScene.labels.map((label) => (
+                <MoleculeLabel
+                  key={label.moleculeId}
+                  libraryId={label.libraryId}
+                  position={label.position}
+                />
+              ))}
+            </>
           )}
           {isTransitioning && transitionStartedAt !== null && (
             <>
@@ -151,14 +225,17 @@ export function DemoPlayer({ demo, initialLevel }: DemoPlayerProps) {
                   durationMs={TRANSITION_MS}
                 />
               ))}
-              {productUnits.map((unit) => (
+              {productLayout.map((unit, i) => (
                 <AnimatedMolecule
-                  key={`enter-${unit.atoms[0]?.moleculeId ?? unit.atoms[0]?.id}`}
+                  // biome-ignore lint/suspicious/noArrayIndexKey: layout order is stable per demo
+                  key={`enter-${i}`}
                   atoms={unit.atoms}
                   bonds={unit.bonds}
                   phase="entering"
                   phaseStartedAt={transitionStartedAt}
                   durationMs={TRANSITION_MS}
+                  targetPosition={unit.targetPosition}
+                  targetScale={unit.scale}
                 />
               ))}
               <ReactionEffect
@@ -166,10 +243,48 @@ export function DemoPlayer({ demo, initialLevel }: DemoPlayerProps) {
                 phaseStartedAt={transitionStartedAt}
                 durationMs={TRANSITION_MS}
               />
+              {/* Environmental driver overlay — lightning bolts for
+                  electricity-driven reactions (e.g. water electrolysis).
+                  Stacks on top of the regular reaction-type effect so
+                  the particles still play their role. */}
+              {demo.energySource === 'electricity' && (
+                <LightningEffect phaseStartedAt={transitionStartedAt} durationMs={TRANSITION_MS} />
+              )}
+              {/* Cover-up flash. Renders last so its additive core and
+                  screen-tint shell sit on top of every other transition
+                  layer, masking the geometry swap at the visual midpoint. */}
+              <TransitionFlash
+                kind={demo.effectKind}
+                phaseStartedAt={transitionStartedAt}
+                durationMs={TRANSITION_MS}
+              />
             </>
           )}
           {(step === 'combine' || step === 'results') && !isTransitioning && (
-            <Molecule atoms={productScene.atoms} bonds={productScene.bonds} />
+            <>
+              {/* Turns on OrbitControls.autoRotate so the camera slowly
+                  circles the target [0,0,0] — kicks in as soon as the
+                  combine transition finishes and stays on through the
+                  results step so the rotation is continuous across both. */}
+              <CameraAutoRotate enabled />
+              <group rotation={[RESULTS_TILT_RAD, 0, 0]}>
+                {productLayout.map((unit, i) => (
+                  <group
+                    // biome-ignore lint/suspicious/noArrayIndexKey: layout order is stable per demo
+                    key={`prod-${i}`}
+                    position={unit.targetPosition}
+                    scale={unit.scale}
+                  >
+                    <Molecule atoms={unit.atoms} bonds={unit.bonds} />
+                    {/* MoleculeLabel rides with the unit's group so it
+                        inherits the tilt + auto-rotate transforms. Only
+                        emitted for library-derived primaries; remainder
+                        bare atoms get their element card from `<Atom>`. */}
+                    {unit.libraryId && <MoleculeLabel libraryId={unit.libraryId} />}
+                  </group>
+                ))}
+              </group>
+            </>
           )}
         </Scene>
       </div>
@@ -180,7 +295,12 @@ export function DemoPlayer({ demo, initialLevel }: DemoPlayerProps) {
           <Link
             href="/demo"
             aria-label="Back to demonstrations"
-            className="inline-flex min-h-[36px] items-center justify-center rounded-full border border-[#2a2655] bg-[#0d0a22]/80 px-3 py-1 text-[#dffaff] text-xs backdrop-blur hover:bg-[#1a163a]"
+            className="button-glow inline-flex h-10 w-10 items-center justify-center rounded-full text-white text-sm font-extrabold transition-transform hover:scale-105 active:scale-95"
+            style={{
+              // Same cool cyan→navy gradient as the footer Back button so
+              // the two "go back" affordances share a visual language.
+              background: 'linear-gradient(135deg, #5cc6ff 0%, #3a2e7a 100%)',
+            }}
           >
             ←
           </Link>
@@ -206,25 +326,34 @@ export function DemoPlayer({ demo, initialLevel }: DemoPlayerProps) {
 
       {/* Bottom: step bubble + Prev/Next nav. */}
       <footer className="absolute right-0 bottom-0 left-0 z-10 flex flex-col gap-3 px-4 pb-5 sm:px-8 sm:pb-8">
-        {/* Step bubble */}
-        <div className="mx-auto w-full max-w-2xl rounded-2xl border border-[#5cc6ff]/30 bg-[#0d0a22]/90 px-5 py-4 text-[#dffaff] shadow-[0_0_32px_rgba(92,198,255,0.18)] backdrop-blur">
-          <div className="mb-2 flex items-center justify-between">
-            <span
-              className="text-[10px] font-extrabold uppercase tracking-[0.25em]"
-              style={{ color: typeColor }}
-            >
-              Step {stepIndex + 1} · {STEP_LABEL[step]}
-            </span>
-            <span className="text-[10px] text-[#6a6f95] uppercase tracking-wider">
-              {level === 'elementary' ? 'Elementary' : 'Advanced'}
-            </span>
+        {/* Step bubble — outer wrapper carries .panel-glow. The three
+            glow layers are explicit child spans (NOT pseudo-elements):
+            the inner content uses backdrop-filter which makes the
+            z-index: -1 trick used by .modal-glow stop working, so we
+            rely on DOM order instead — the spans come BEFORE the
+            content, so natural painting order keeps them behind. */}
+        <div className="panel-glow mx-auto w-full max-w-2xl rounded-2xl">
+          <span className="panel-glow-layer-1" aria-hidden="true" />
+          <span className="panel-glow-layer-2" aria-hidden="true" />
+          <div className="relative rounded-2xl border border-[#5cc6ff]/30 bg-[#0d0a22]/90 px-5 py-4 text-[#dffaff] backdrop-blur">
+            <div className="mb-2 flex items-center justify-between">
+              <span
+                className="text-[10px] font-extrabold uppercase tracking-[0.25em]"
+                style={{ color: typeColor }}
+              >
+                Step {stepIndex + 1} · {STEP_LABEL[step]}
+              </span>
+              <span className="text-[10px] text-[#6a6f95] uppercase tracking-wider">
+                {level === 'elementary' ? 'Elementary' : 'Advanced'}
+              </span>
+            </div>
+            <p className="text-[#dffaff] text-sm leading-relaxed sm:text-base">{bubbleText}</p>
+            {/* Results step also surfaces the engine-level enthalpy snippet
+                when one is available — small, factual, not in either voice. */}
+            {step === 'results' && reaction?.notes && (
+              <p className="mt-2 text-[#9aa0c8] text-xs leading-relaxed">{reaction.notes}</p>
+            )}
           </div>
-          <p className="text-[#dffaff] text-sm leading-relaxed sm:text-base">{bubbleText}</p>
-          {/* Results step also surfaces the engine-level enthalpy snippet
-              when one is available — small, factual, not in either voice. */}
-          {step === 'results' && reaction?.notes && (
-            <p className="mt-2 text-[#9aa0c8] text-xs leading-relaxed">{reaction.notes}</p>
-          )}
         </div>
 
         {/* Step nav */}
@@ -233,7 +362,13 @@ export function DemoPlayer({ demo, initialLevel }: DemoPlayerProps) {
             type="button"
             onClick={goPrev}
             disabled={!canPrev}
-            className="min-h-[40px] rounded-full border border-[#2a2655] bg-[#0d0a22]/80 px-4 py-1.5 text-[#dffaff] text-xs font-extrabold uppercase tracking-wider transition-colors hover:bg-[#1a163a] disabled:opacity-30"
+            className="button-glow inline-flex min-h-[40px] items-center gap-1 rounded-full px-5 py-1.5 text-white text-xs font-extrabold uppercase tracking-wider transition-transform hover:scale-105 active:scale-95 disabled:opacity-30 disabled:hover:scale-100"
+            style={{
+              // Cool cyan→navy gradient that visually recedes vs the bright
+              // forward CTA's cyan→magenta→gold. Reads as "secondary action"
+              // without dropping out of the design language.
+              background: 'linear-gradient(90deg, #5cc6ff 0%, #3a2e7a 100%)',
+            }}
           >
             ← Back
           </button>
@@ -273,6 +408,119 @@ export function DemoPlayer({ demo, initialLevel }: DemoPlayerProps) {
       )}
     </div>
   )
+}
+
+/**
+ * Compute a bounding-sphere radius around origin for `points` and move
+ * the active camera along its current viewing direction so the sphere
+ * fits inside the viewport, given the camera's FOV and the current
+ * aspect ratio. Re-runs whenever the points list, viewport, or `active`
+ * flag changes — so resizing the window or switching steps re-frames
+ * the scene automatically.
+ *
+ * Why bounding-sphere (not bounding-box): the camera orbits via
+ * OrbitControls.autoRotate. Distance from origin is the only invariant
+ * during orbit, so fitting the sphere guarantees the scene stays in
+ * frame from every orbit angle.
+ */
+function CameraAutoFit({
+  points,
+  active,
+}: {
+  points: ReadonlyArray<readonly [number, number, number]>
+  active: boolean
+}) {
+  const camera = useThree((s) => s.camera) as PerspectiveCameraImpl
+  const size = useThree((s) => s.size)
+  // Target distance from origin the camera should converge to. `null`
+  // means "don't touch the camera this frame" (e.g. during the merge
+  // transition, where we want the camera stable).
+  const targetDistance = useRef<number | null>(null)
+  // Tracks whether the very first fit has happened yet. The first fit
+  // SNAPS so the user sees a correctly-framed step 1 from frame zero;
+  // every subsequent fit (step change, resize) tweens via useFrame so
+  // the camera glides instead of popping.
+  const hasFitOnce = useRef(false)
+
+  // Recompute the target whenever inputs change. The actual camera move
+  // happens in the useFrame below — this effect only updates the target.
+  useEffect(() => {
+    if (!active || points.length === 0) {
+      targetDistance.current = null
+      return
+    }
+    // Bounding-sphere radius from origin (sphere centered at origin).
+    let maxR2 = 0
+    for (const p of points) {
+      const r2 = p[0] * p[0] + p[1] * p[1] + p[2] * p[2]
+      if (r2 > maxR2) maxR2 = r2
+    }
+    const radius = Math.sqrt(maxR2) + ATOM_FIT_RADIUS
+
+    // Distance to fit a sphere of `radius` given a vertical FOV `fov`
+    // and aspect = width/height. If aspect < 1 (portrait), the
+    // horizontal axis is the tighter constraint, so back off further.
+    const aspect = size.width / Math.max(1, size.height)
+    const vFov = (camera.fov * Math.PI) / 180
+    const halfTanV = Math.tan(vFov / 2)
+    const limitingTan = halfTanV * Math.min(1, aspect)
+    const target = (radius / limitingTan) * FIT_PADDING
+    targetDistance.current = target
+
+    // First fit: snap immediately so step 1 is framed correctly the
+    // moment it's drawn (no slow ramp up from the default z=8).
+    if (!hasFitOnce.current) {
+      hasFitOnce.current = true
+      const current = camera.position.length()
+      if (current > 1e-6) {
+        camera.position.multiplyScalar(target / current)
+        camera.updateProjectionMatrix()
+      }
+    }
+  }, [active, points, size.width, size.height, camera.fov, camera])
+
+  // Frame-by-frame exponential decay toward the target distance. Scales
+  // the camera's existing position vector so it stays on its current
+  // orbit ray — OrbitControls' autoRotate keeps advancing the orbit
+  // direction underneath, and we just slide along it.
+  useFrame((_, delta) => {
+    const target = targetDistance.current
+    if (target === null) return
+    const current = camera.position.length()
+    if (current < 1e-6) return
+    const k = 1 - Math.exp(-ZOOM_LAMBDA * delta)
+    const next = current + (target - current) * k
+    // Skip the multiply/copy when we're effectively at target — avoids
+    // touching the camera on every idle frame.
+    if (Math.abs(next - current) < 1e-4) return
+    camera.position.multiplyScalar(next / current)
+  })
+
+  return null
+}
+
+/**
+ * Toggles OrbitControls' autoRotate on the makeDefault'd controls
+ * instance. Mounted as a render-only side-effect node inside the Canvas
+ * so it can grab the controls via `useThree`. Cleans up on unmount so
+ * the auto-rotation only happens while the Results step is active —
+ * other steps see a static framing.
+ */
+function CameraAutoRotate({ enabled }: { enabled: boolean }) {
+  const controls = useThree(
+    (s) => s.controls as { autoRotate?: boolean; autoRotateSpeed?: number } | null,
+  )
+  useEffect(() => {
+    if (!controls) return
+    controls.autoRotate = enabled
+    if (controls.autoRotateSpeed !== undefined) {
+      controls.autoRotateSpeed = RESULTS_AUTO_ROTATE_SPEED
+    }
+    return () => {
+      controls.autoRotate = false
+    }
+  }, [controls, enabled])
+  return null
 }
 
 interface MoleculeUnit {
