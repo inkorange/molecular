@@ -6,6 +6,7 @@ import Link from 'next/link'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { Group } from 'three'
 import { type Atom, atomId, type Bond, bondId, moleculeId } from '@/src/chem/types'
+import { useReducedMotion } from '@/src/lib/useReducedMotion'
 import { Molecule } from '@/src/scene/Molecule'
 import { Scene } from '@/src/scene/Scene'
 import { getReelMolecule, REEL } from './reelData'
@@ -85,10 +86,20 @@ function ReelStage({ atoms, bonds, phase, phaseStartedAt }: ReelStageProps) {
   const baseYaw = Math.PI / 4
 
   const groupRef = useRef<Group>(null)
+  // When the OS asks for reduced motion, hold the molecule at its base
+  // scale + yaw with no per-phase tweening. The parent already pins
+  // phase to 'stable' in that mode, but skipping the useFrame work
+  // entirely also avoids any visual drift.
+  const reducedMotion = useReducedMotion()
 
   useFrame(() => {
     const g = groupRef.current
     if (!g) return
+    if (reducedMotion) {
+      g.scale.setScalar(baseScale)
+      g.rotation.y = baseYaw
+      return
+    }
     const t = Math.min(1, (performance.now() - phaseStartedAt) / TRANSITION_MS)
     let factor = 1
     let yawOffset = 0
@@ -128,12 +139,22 @@ export function HomepageReel() {
   const [phaseStartedAt, setPhaseStartedAt] = useState(() => performance.now())
   const step = REEL[stepIndex] ?? REEL[0]!
   const scene = useMemo(() => buildSceneFor(step.libraryId), [step.libraryId])
+  // OS-level "reduce motion" pins the reel: hold the FIRST molecule in
+  // 'stable' phase indefinitely, no pop-in / spin-out / step advance.
+  const reducedMotion = useReducedMotion()
+  useEffect(() => {
+    if (reducedMotion) {
+      setStepIndex(0)
+      setPhase('stable')
+    }
+  }, [reducedMotion])
 
   // Phase scheduler. Each phase change registers its own timer to flip to
   // the next phase. stepIndex is intentionally in the deps so the effect
   // re-fires on every advance even when the phase happens to repeat.
   // biome-ignore lint/correctness/useExhaustiveDependencies: stepIndex re-runs the timer per step
   useEffect(() => {
+    if (reducedMotion) return
     if (phase === 'entering') {
       const t = setTimeout(() => {
         setPhase('stable')
@@ -158,7 +179,7 @@ export function HomepageReel() {
       setPhaseStartedAt(performance.now())
     }, TRANSITION_MS)
     return () => clearTimeout(t)
-  }, [phase, stepIndex, step.durationMs])
+  }, [phase, stepIndex, step.durationMs, reducedMotion])
 
   return (
     <div className="absolute inset-0 z-0">

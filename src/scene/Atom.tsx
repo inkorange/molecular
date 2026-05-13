@@ -18,6 +18,7 @@ import { getElement } from '@/src/chem/elements'
 import { freeCapacity } from '@/src/chem/rules'
 import type { AtomId, ElementCategory } from '@/src/chem/types'
 import { usePointerToWorld } from '@/src/lib/usePointerToWorld'
+import { useReducedMotion } from '@/src/lib/useReducedMotion'
 import { useStore } from '@/src/store'
 import { ElectronSprite } from './ElectronSprite'
 
@@ -115,6 +116,10 @@ export function Atom({ Z, position, atomId, showLabel = true, scale = 1, opacity
   const cardRef = useRef<Group>(null)
   const cardTmp = useMemo(() => new Vector3(), [])
   const targetRingRef = useRef<Mesh>(null)
+  // Honor the OS reduced-motion preference: skip electron orbit and
+  // target-ring pulse. The card scaling stays on regardless — that's
+  // about readability, not motion.
+  const reducedMotion = useReducedMotion()
 
   // Selection / highlight wiring. Only selectable while in Build mode with
   // nothing currently held (so the click doesn't fight drag-drop) and the
@@ -301,25 +306,29 @@ export function Atom({ Z, position, atomId, showLabel = true, scale = 1, opacity
   }, [trailLines])
 
   useFrame(({ camera, clock }, delta) => {
-    // Electron orbits.
-    for (let i = 0; i < electronRefs.current.length; i++) {
-      const ref = electronRefs.current[i]
-      const plan = electronPlans[i]
-      if (!ref || !plan) continue
-      ref.rotation.y += delta * plan.speed
+    // Electron orbits — skipped when the user prefers reduced motion.
+    if (!reducedMotion) {
+      for (let i = 0; i < electronRefs.current.length; i++) {
+        const ref = electronRefs.current[i]
+        const plan = electronPlans[i]
+        if (!ref || !plan) continue
+        ref.rotation.y += delta * plan.speed
+      }
     }
     // Constant-screen-size scaling on the label card: world scale proportional
     // to camera distance so its projected pixel size stays fixed regardless of zoom.
     // Multiply by cardViewportScale so cards shrink on tablet/mobile breakpoints.
+    // Not animation — this is readability, so it runs in both modes.
     if (cardRef.current) {
       cardRef.current.getWorldPosition(cardTmp)
       const d = camera.position.distanceTo(cardTmp)
       cardRef.current.scale.setScalar((d / CARD_REFERENCE_DISTANCE) * cardViewportScale)
     }
     // Subtle breathing pulse on the connect-target ring so it reads as
-    // "tap me" rather than a static decoration.
+    // "tap me" rather than a static decoration. Hold at scale 1 when
+    // reduced motion is requested so it doesn't pulse.
     if (targetRingRef.current) {
-      const pulse = 1 + 0.12 * Math.sin(clock.elapsedTime * 4)
+      const pulse = reducedMotion ? 1 : 1 + 0.12 * Math.sin(clock.elapsedTime * 4)
       targetRingRef.current.scale.setScalar(pulse)
     }
   })
