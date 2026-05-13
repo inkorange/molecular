@@ -1,5 +1,6 @@
 import { streamText } from 'ai'
 import { z } from 'zod'
+import { clientKey, rateLimit } from '@/src/lib/rateLimit'
 
 // Default Vercel runtime (Fluid Compute / Node). Edge isn't needed —
 // streamText handles SSE buffering itself, and Node lets us use the
@@ -30,6 +31,20 @@ Use precise college-level terms: electronegativity, hybridization, formal charge
 }
 
 export async function POST(req: Request) {
+  // Rate limit before doing any work — caps abuse + keeps Gateway spend
+  // bounded. 10 requests per IP per minute is generous for a tutor chat
+  // (one tap-tap-tap user wouldn't hit it) but stops scripted bombing.
+  const limit = rateLimit(clientKey(req), { max: 10, windowMs: 60_000 })
+  if (!limit.allowed) {
+    return new Response(JSON.stringify({ error: 'Too many requests' }), {
+      status: 429,
+      headers: {
+        'content-type': 'application/json',
+        'retry-after': String(limit.retryAfterSec),
+      },
+    })
+  }
+
   const json = await req.json()
   const parsed = PayloadSchema.safeParse(json)
   if (!parsed.success) {

@@ -171,6 +171,17 @@ body {
     transform: rotate(-360deg);
   }
 }
+/* One-shot mount fade for .modal-glow. Plays once when the wrapper mounts
+ * with the parent in its open state. The close-side fade rides the
+ * `transition: opacity` rule and triggers via [data-state="closed"]. */
+@keyframes modal-glow-mount {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
 
 /* Tailwind v4's CSS optimizer can drop custom rules that live outside any
  * `@layer`. Wrapping the halo block in `@layer components` keeps it in the
@@ -185,6 +196,22 @@ body {
     position: relative;
     isolation: isolate;
     overflow: visible;
+    /* Fade-in on mount + fade-out on parent close. The pseudo-elements
+     inherit this wrapper opacity, so all three halo layers tween together
+     instead of popping in/out when the drawer slides. */
+    opacity: 1;
+    animation: modal-glow-mount 280ms ease-out;
+    transition: opacity 200ms ease-out;
+  }
+
+  /* When the parent dialog/drawer/sheet enters its closed state, fade the
+   halo out so it doesn't sit fully opaque while the content slides away.
+   We target both data-state="closed" (vaul drawer + Base UI value form)
+   and the bare [data-closed] attribute (Base UI shorthand) to cover the
+   three different shell components we use. */
+  [data-state="closed"] .modal-glow,
+  [data-closed] .modal-glow {
+    opacity: 0;
   }
   .modal-glow::before,
   .modal-glow::after {
@@ -244,4 +271,51 @@ body {
       animation: none;
     }
   }
+
+  /* Tighter sibling of .modal-glow for buttons. The element holding the
+   * gradient stays put (same shape as the button) — only the conic gradient's
+   * angle rotates via @property. This way the blurred halo always hugs the
+   * button outline; nothing swings out past the rounded-pill silhouette.
+   * Apply to any positioned button-like element. */
+  .button-glow {
+    position: relative;
+    isolation: isolate;
+  }
+  /* Pseudo-element keeps the button's pill silhouette (border-radius: inherit)
+   * and never rotates as a shape — so the halo always hugs the button outline.
+   * Color motion comes from sliding a wide linear gradient horizontally via
+   * background-position, which animates smoothly in every browser without
+   * needing @property. */
+  .button-glow::before {
+    content: "";
+    position: absolute;
+    inset: -10px;
+    border-radius: inherit;
+    background: linear-gradient(
+      90deg,
+      #5cc6ff 0%,
+      #ec59b6 25%,
+      #ffd97a 50%,
+      #ec59b6 75%,
+      #5cc6ff 100%
+    );
+    background-size: 200% 100%;
+    background-position: 0% 0%;
+    filter: blur(14px);
+    opacity: 0.35;
+    pointer-events: none;
+    z-index: -1;
+    animation: button-glow-sweep 6s linear infinite;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .button-glow::before {
+      animation: none;
+    }
+  }
 } /* end @layer components */
+
+@keyframes button-glow-sweep {
+  to {
+    background-position: 200% 0%;
+  }
+}

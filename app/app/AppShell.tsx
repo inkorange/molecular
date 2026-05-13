@@ -109,7 +109,7 @@ export function AppShell() {
               type="button"
               onClick={handleClear}
               aria-label="Clear scene"
-              className="inline-flex min-h-[40px] items-center gap-1 rounded-full px-4 py-1.5 text-xs font-extrabold uppercase tracking-wider text-white shadow-[0_0_18px_rgba(255,122,140,0.45)] transition-transform hover:scale-105 active:scale-95"
+              className="button-glow inline-flex min-h-[40px] items-center gap-1 rounded-full px-4 py-1.5 text-xs font-extrabold uppercase tracking-wider text-white transition-transform hover:scale-105 active:scale-95"
               style={{ background: 'linear-gradient(135deg, #ff7a8c 0%, #ec59b6 100%)' }}
             >
               Clear
@@ -120,7 +120,7 @@ export function AppShell() {
               render={
                 <button
                   type="button"
-                  className="inline-flex min-h-[40px] items-center gap-1 rounded-full px-4 py-1.5 text-xs font-extrabold uppercase tracking-wider text-white shadow-[0_0_18px_rgba(92,198,255,0.45)] transition-transform hover:scale-105 active:scale-95"
+                  className="button-glow inline-flex min-h-[40px] items-center gap-1 rounded-full px-4 py-1.5 text-xs font-extrabold uppercase tracking-wider text-white transition-transform hover:scale-105 active:scale-95"
                   style={{ background: 'linear-gradient(135deg, #5cc6ff 0%, #3a2e7a 100%)' }}
                 >
                   Info
@@ -171,7 +171,7 @@ export function AppShell() {
               render={
                 <button
                   type="button"
-                  className="inline-flex min-h-[40px] items-center gap-1 rounded-full px-4 py-1.5 text-xs font-extrabold uppercase tracking-wider text-white shadow-[0_0_18px_rgba(255,217,122,0.45)] transition-transform hover:scale-105 active:scale-95"
+                  className="button-glow inline-flex min-h-[40px] items-center gap-1 rounded-full px-4 py-1.5 text-xs font-extrabold uppercase tracking-wider text-white transition-transform hover:scale-105 active:scale-95"
                   style={{ background: 'linear-gradient(135deg, #ffd97a 0%, #ec59b6 100%)' }}
                 >
                   Tutor
@@ -180,12 +180,20 @@ export function AppShell() {
             />
             <SheetContent
               side="bottom"
-              className="h-[70vh] border-[#5cc6ff]/40 bg-[#0d0a22] p-0 text-[#dffaff] sm:h-[60vh]"
+              // Inline style wins specificity against shadcn's
+              // `data-[side=bottom]:h-auto` default. Fixed + max height pin the
+              // sheet to 60vh so the chat scrolls internally instead of
+              // pushing past the viewport top when the thread grows long.
+              style={{ height: '60vh', maxHeight: '60vh' }}
+              className="flex flex-col gap-0 overflow-hidden border-[#5cc6ff]/40 bg-[#0d0a22] p-0 text-[#dffaff]"
             >
-              <SheetTitle className="border-[#2a2655] border-b px-4 py-3 text-xs font-extrabold uppercase tracking-[0.25em] text-[#dffaff]">
+              <SheetTitle className="shrink-0 border-[#2a2655] border-b px-4 py-3 text-xs font-extrabold uppercase tracking-[0.25em] text-[#dffaff]">
                 Chemistry tutor
               </SheetTitle>
-              <div className="flex h-[calc(100%-2.75rem)] flex-col">
+              {/* min-h-0 + flex-1 lets the TutorPanel claim the remaining
+                  height without overflowing the sheet. TutorPanel's internal
+                  message list owns the overflow-y-auto. */}
+              <div className="min-h-0 flex-1">
                 <TutorPanel />
               </div>
             </SheetContent>
@@ -239,7 +247,7 @@ export function AppShell() {
           >
             <ValidityBar />
             <span
-              className="inline-flex min-h-[44px] items-center gap-2 rounded-full px-5 py-2 text-sm font-extrabold uppercase tracking-wider text-white shadow-[0_0_24px_rgba(236,89,182,0.55)] transition-transform hover:scale-105 active:scale-95"
+              className="button-glow inline-flex min-h-[44px] items-center gap-2 rounded-full px-5 py-2 text-sm font-extrabold uppercase tracking-wider text-white transition-transform hover:scale-105 active:scale-95"
               style={{
                 background: 'linear-gradient(90deg, #5cc6ff 0%, #ec59b6 50%, #ffd97a 100%)',
               }}

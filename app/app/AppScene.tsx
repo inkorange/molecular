@@ -24,12 +24,17 @@ export function AppScene() {
   const addBond = useStore((s) => s.addBond)
   const addMolecule = useStore((s) => s.addMolecule)
 
-  // Spawn water on first mount if the scene is empty.
+  // First-mount spawn. Honours `?molecule=<libId>` from a landing deep link
+  // so visitors who tap a feature card or the reel CTA land in the app
+  // already looking at the molecule they clicked. Falls back to water when
+  // the param is missing or the lib id isn't recognised.
   useEffect(() => {
     if (Object.keys(useStore.getState().scene.atoms).length > 0) return
-    const water = getLibraryEntry('water')
-    if (!water) return
-    const result = spawnLibraryEntry(water)
+    const params = new URLSearchParams(window.location.search)
+    const lib = params.get('molecule') ?? 'water'
+    const entry = getLibraryEntry(lib) ?? getLibraryEntry('water')
+    if (!entry) return
+    const result = spawnLibraryEntry(entry)
     addMolecule(result.molecule)
     for (const a of result.atoms) addAtom(a)
     for (const b of result.bonds) addBond(b)
