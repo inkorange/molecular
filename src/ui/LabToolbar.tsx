@@ -133,123 +133,139 @@ export function LabToolbar() {
   }
 
   return (
-    <div className="absolute right-4 bottom-20 z-20 flex max-w-[200px] flex-col items-stretch gap-2">
-      {/* Plain-English hint so users understand what the toolbar does. */}
-      <p className="rounded-md border border-[#5cc6ff]/30 bg-[#0d0a22]/85 px-3 py-2 text-[10px] leading-snug text-[#9aa0c8] backdrop-blur">
+    <>
+      {/* Mobile-only hint banner — pinned below the top toolbar so it sits
+          out of the way of the right-side button column. On sm+ the hint
+          renders inline at the top of the right column instead (below). */}
+      <p className="absolute top-16 right-2 left-2 z-10 rounded-md border border-[#5cc6ff]/30 bg-[#0d0a22]/85 px-3 py-2 text-[10px] leading-snug text-[#9aa0c8] backdrop-blur sm:hidden">
         Add reactants, then tap <span className="font-bold text-[#5cc6ff]">Combine reactants</span>{' '}
         to run any matching reaction.
       </p>
-      <Button
-        onClick={() => add('hydrogen-gas')}
-        size="sm"
-        className="min-h-[40px] border border-[#2a2655] bg-[#14112e] text-[#dffaff] hover:bg-[#1a163a]"
-      >
-        + Hydrogen (H₂)
-      </Button>
-      <Button
-        onClick={() => add('oxygen-gas')}
-        size="sm"
-        className="min-h-[40px] border border-[#2a2655] bg-[#14112e] text-[#dffaff] hover:bg-[#1a163a]"
-      >
-        + Oxygen (O₂)
-      </Button>
-      <Sheet open={reactantsOpen} onOpenChange={setReactantsOpen}>
-        <SheetTrigger
-          render={
-            <Button
-              size="sm"
-              className="min-h-[40px] border border-[#2a2655] bg-[#14112e] text-[#9aa0c8] hover:bg-[#1a163a] hover:text-[#dffaff]"
-            >
-              + More reactants…
-            </Button>
-          }
-        />
-        <SheetContent side="right" className="border-[#2a2655] bg-[#0d0a22] text-[#dffaff]">
-          <SheetTitle className="px-3 pt-3 text-sm font-bold uppercase tracking-wider text-[#9aa0c8]">
-            Add reactant
-          </SheetTitle>
-          <div className="flex flex-col gap-1 p-3">
-            {MORE_REACTANTS.map((r) => (
-              <button
-                type="button"
-                key={r.id}
-                onClick={() => {
-                  add(r.id)
-                  setReactantsOpen(false)
-                }}
-                className="min-h-[44px] rounded-md border border-[#2a2655] bg-[#14112e] px-3 py-2 text-left text-sm text-[#dffaff] transition-colors hover:border-[#5cc6ff]/40 hover:bg-[#1a163a]"
+      <div className="absolute right-2 bottom-20 z-20 flex max-w-[108px] flex-col items-stretch gap-1.5 sm:right-4 sm:max-w-[200px] sm:gap-2">
+        {/* Desktop hint, inline at the top of the right column. */}
+        <p className="hidden rounded-md border border-[#5cc6ff]/30 bg-[#0d0a22]/85 px-3 py-2 text-[10px] leading-snug text-[#9aa0c8] backdrop-blur sm:block">
+          Add reactants, then tap{' '}
+          <span className="font-bold text-[#5cc6ff]">Combine reactants</span> to run any matching
+          reaction.
+        </p>
+        <Button
+          onClick={() => add('hydrogen-gas')}
+          size="sm"
+          className="min-h-[40px] border border-[#2a2655] bg-[#14112e] text-[#dffaff] hover:bg-[#1a163a]"
+        >
+          <span className="sm:hidden">+ H₂</span>
+          <span className="hidden sm:inline">+ Hydrogen (H₂)</span>
+        </Button>
+        <Button
+          onClick={() => add('oxygen-gas')}
+          size="sm"
+          className="min-h-[40px] border border-[#2a2655] bg-[#14112e] text-[#dffaff] hover:bg-[#1a163a]"
+        >
+          <span className="sm:hidden">+ O₂</span>
+          <span className="hidden sm:inline">+ Oxygen (O₂)</span>
+        </Button>
+        <Sheet open={reactantsOpen} onOpenChange={setReactantsOpen}>
+          <SheetTrigger
+            render={
+              <Button
+                size="sm"
+                className="min-h-[40px] border border-[#2a2655] bg-[#14112e] text-[#9aa0c8] hover:bg-[#1a163a] hover:text-[#dffaff]"
               >
-                + {r.label}
-              </button>
-            ))}
-          </div>
-        </SheetContent>
-      </Sheet>
-      <Sheet open={hintsOpen} onOpenChange={setHintsOpen}>
-        <SheetTrigger
-          render={
-            <Button
-              size="sm"
-              className="min-h-[40px] border border-[#ffd97a]/50 bg-[#14112e] font-bold text-[#ffd97a] hover:bg-[#1a163a]"
-            >
-              💡 Hints
-              {hints.some((h) => h.status === 'ready') && (
-                <span className="ml-1 inline-block h-2 w-2 rounded-full bg-[#a4ff8c]" />
-              )}
-            </Button>
-          }
-        />
-        <SheetContent side="right" className="border-[#2a2655] bg-[#0d0a22] text-[#dffaff]">
-          <SheetTitle className="px-3 pt-3 text-sm font-bold uppercase tracking-wider text-[#9aa0c8]">
-            Reaction hints
-          </SheetTitle>
-          <div className="min-h-0 flex-1 overflow-y-auto">
-            <RecipeHintPanel
-              hints={hints}
-              onCombine={(hint) => {
-                combineHint(hint)
-                // Leave the sheet open so the user can see the panel update
-                // (the just-fired reaction's card will fall off and any new
-                // recipes the products enable will appear).
-              }}
-              onAddReactant={(libId) => add(libId)}
-              onDismiss={dismissHint}
-            />
-          </div>
-        </SheetContent>
-      </Sheet>
-      <Button
-        onClick={react}
-        size="sm"
-        className="min-h-[40px] bg-[#5cc6ff] font-bold text-[#07051a] hover:bg-[#80d4ff]"
-      >
-        Combine reactants
-      </Button>
-      <Sheet open={logOpen} onOpenChange={setLogOpen}>
-        <SheetTrigger
-          render={
-            <Button
-              size="sm"
-              className="min-h-[40px] border border-[#2a2655] bg-[#14112e] text-[#dffaff] hover:bg-[#1a163a]"
-            >
-              Reaction log
-            </Button>
-          }
-        />
-        <SheetContent side="right" className="border-[#2a2655] bg-[#0d0a22] text-[#dffaff]">
-          <SheetTitle className="px-3 pt-3 text-sm font-bold uppercase tracking-wider text-[#9aa0c8]">
-            Reaction Log
-          </SheetTitle>
-          <ReactionLog />
-        </SheetContent>
-      </Sheet>
-      <Button
-        onClick={resetLab}
-        size="sm"
-        className="min-h-[40px] border border-[#ff7a7a]/40 bg-transparent text-[#ff7a7a] hover:bg-[#5a1f1f]/30"
-      >
-        Reset scene
-      </Button>
-    </div>
+                <span className="sm:hidden">+ More…</span>
+                <span className="hidden sm:inline">+ More reactants…</span>
+              </Button>
+            }
+          />
+          <SheetContent side="right" className="border-[#2a2655] bg-[#0d0a22] text-[#dffaff]">
+            <SheetTitle className="px-3 pt-3 text-sm font-bold uppercase tracking-wider text-[#9aa0c8]">
+              Add reactant
+            </SheetTitle>
+            <div className="flex flex-col gap-1 p-3">
+              {MORE_REACTANTS.map((r) => (
+                <button
+                  type="button"
+                  key={r.id}
+                  onClick={() => {
+                    add(r.id)
+                    setReactantsOpen(false)
+                  }}
+                  className="min-h-[44px] rounded-md border border-[#2a2655] bg-[#14112e] px-3 py-2 text-left text-sm text-[#dffaff] transition-colors hover:border-[#5cc6ff]/40 hover:bg-[#1a163a]"
+                >
+                  + {r.label}
+                </button>
+              ))}
+            </div>
+          </SheetContent>
+        </Sheet>
+        <Sheet open={hintsOpen} onOpenChange={setHintsOpen}>
+          <SheetTrigger
+            render={
+              <Button
+                size="sm"
+                className="min-h-[40px] border border-[#ffd97a]/50 bg-[#14112e] font-bold text-[#ffd97a] hover:bg-[#1a163a]"
+              >
+                💡 Hints
+                {hints.some((h) => h.status === 'ready') && (
+                  <span className="ml-1 inline-block h-2 w-2 rounded-full bg-[#a4ff8c]" />
+                )}
+              </Button>
+            }
+          />
+          <SheetContent side="right" className="border-[#2a2655] bg-[#0d0a22] text-[#dffaff]">
+            <SheetTitle className="px-3 pt-3 text-sm font-bold uppercase tracking-wider text-[#9aa0c8]">
+              Reaction hints
+            </SheetTitle>
+            <div className="min-h-0 flex-1 overflow-y-auto">
+              <RecipeHintPanel
+                hints={hints}
+                onCombine={(hint) => {
+                  combineHint(hint)
+                  // Leave the sheet open so the user can see the panel update
+                  // (the just-fired reaction's card will fall off and any new
+                  // recipes the products enable will appear).
+                }}
+                onAddReactant={(libId) => add(libId)}
+                onDismiss={dismissHint}
+              />
+            </div>
+          </SheetContent>
+        </Sheet>
+        <Button
+          onClick={react}
+          size="sm"
+          className="min-h-[40px] bg-[#5cc6ff] font-bold text-[#07051a] hover:bg-[#80d4ff]"
+        >
+          <span className="sm:hidden">Combine</span>
+          <span className="hidden sm:inline">Combine reactants</span>
+        </Button>
+        <Sheet open={logOpen} onOpenChange={setLogOpen}>
+          <SheetTrigger
+            render={
+              <Button
+                size="sm"
+                className="min-h-[40px] border border-[#2a2655] bg-[#14112e] text-[#dffaff] hover:bg-[#1a163a]"
+              >
+                <span className="sm:hidden">Log</span>
+                <span className="hidden sm:inline">Reaction log</span>
+              </Button>
+            }
+          />
+          <SheetContent side="right" className="border-[#2a2655] bg-[#0d0a22] text-[#dffaff]">
+            <SheetTitle className="px-3 pt-3 text-sm font-bold uppercase tracking-wider text-[#9aa0c8]">
+              Reaction Log
+            </SheetTitle>
+            <ReactionLog />
+          </SheetContent>
+        </Sheet>
+        <Button
+          onClick={resetLab}
+          size="sm"
+          className="min-h-[40px] border border-[#ff7a7a]/40 bg-transparent text-[#ff7a7a] hover:bg-[#5a1f1f]/30"
+        >
+          <span className="sm:hidden">Reset</span>
+          <span className="hidden sm:inline">Reset scene</span>
+        </Button>
+      </div>
+    </>
   )
 }
