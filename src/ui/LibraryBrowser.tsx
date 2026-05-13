@@ -12,6 +12,7 @@ export function LibraryBrowser({ onPick }: { onPick?: () => void }) {
   const addBond = useStore((s) => s.addBond)
   const addMolecule = useStore((s) => s.addMolecule)
   const resetScene = useStore((s) => s.resetScene)
+  const setLastAddedLibId = useStore((s) => s.setLastAddedLibId)
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase()
@@ -45,6 +46,10 @@ export function LibraryBrowser({ onPick }: { onPick?: () => void }) {
     addMolecule(result.molecule)
     for (const a of result.atoms) addAtom(a)
     for (const b of result.bonds) addBond(b)
+    // Remember this pick so Lab Reset returns here. Lab toolbar reactant
+    // adds do NOT update this — Reset's job is to restore the user's
+    // chosen base scene, not the most recent reactant they were testing.
+    setLastAddedLibId(id)
     onPick?.()
   }
 

@@ -45,7 +45,6 @@ export function LabToolbar() {
   const clearReactionLog = useStore((s) => s.clearReactionLog)
   const addPendingReactant = useStore((s) => s.addPendingReactant)
   const clearPendingReactants = useStore((s) => s.clearPendingReactants)
-  const setLastAddedLibId = useStore((s) => s.setLastAddedLibId)
   const dismissHint = useStore((s) => s.dismissHint)
   const clearDismissedHints = useStore((s) => s.clearDismissedHints)
   const dismissedHintIds = useStore((s) => s.lab.dismissedHintIds)
@@ -113,9 +112,10 @@ export function LabToolbar() {
     // Mark this molecule as a user-added reactant. The Combine button only
     // runs reactions whose recipes are satisfied by this pool — so once the
     // user's reactants have been consumed, repeated Combine clicks no-op.
+    // Note: we deliberately do NOT update lastAddedLibId here. Reset uses
+    // that to restore the user's chosen base scene (the molecule they
+    // picked from the bottom drawer), not the last reactant they tested.
     addPendingReactant(result.molecule.id)
-    // Remember which library entry this was so Reset can return here later.
-    setLastAddedLibId(libId)
   }
 
   function react() {
