@@ -11,6 +11,9 @@ interface RecipeHintPanelProps {
   /** Add one instance of the given library entry to the scene as a pending
    *  reactant. Panel resolves the formula to a libId before calling. */
   onAddReactant: (libId: string) => void
+  /** Optional. When supplied, each hint card shows an × that calls this to
+   *  hide the reaction from the panel until the lab is reset. */
+  onDismiss?: (reactionId: string) => void
 }
 
 const ENTHALPY_LABEL: Record<RecipeHint['enthalpy'], string> = {
@@ -33,7 +36,12 @@ const ENTHALPY_COLOR: Record<RecipeHint['enthalpy'], string> = {
  * are surfaced as informational text instead of an Add button — the
  * library doesn't expose those as individually-spawnable molecules.
  */
-export function RecipeHintPanel({ hints, onCombine, onAddReactant }: RecipeHintPanelProps) {
+export function RecipeHintPanel({
+  hints,
+  onCombine,
+  onAddReactant,
+  onDismiss,
+}: RecipeHintPanelProps) {
   if (hints.length === 0) {
     return (
       <div className="px-4 py-6 text-center text-xs text-[#6a6f95]">
@@ -57,11 +65,23 @@ export function RecipeHintPanel({ hints, onCombine, onAddReactant }: RecipeHintP
           >
             <div className="flex items-baseline justify-between gap-2">
               <span className="font-mono text-sm text-[#dffaff]">{hint.equation}</span>
-              <span
-                className={`text-[10px] uppercase tracking-wider ${ENTHALPY_COLOR[hint.enthalpy]}`}
-              >
-                {ENTHALPY_LABEL[hint.enthalpy]}
-              </span>
+              <div className="flex items-center gap-2">
+                <span
+                  className={`text-[10px] uppercase tracking-wider ${ENTHALPY_COLOR[hint.enthalpy]}`}
+                >
+                  {ENTHALPY_LABEL[hint.enthalpy]}
+                </span>
+                {onDismiss && (
+                  <button
+                    type="button"
+                    onClick={() => onDismiss(hint.reactionId)}
+                    aria-label={`Dismiss ${hint.equation}`}
+                    className="flex h-5 w-5 items-center justify-center rounded-full text-[#6a6f95] transition-colors hover:bg-[#1a163a] hover:text-[#dffaff]"
+                  >
+                    ×
+                  </button>
+                )}
+              </div>
             </div>
             {hint.notes && (
               <p className="mt-1 text-[11px] leading-snug text-[#9aa0c8]">{hint.notes}</p>

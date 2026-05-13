@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Sheet, SheetContent, SheetTitle, SheetTrigger } from '@/components/ui/sheet'
 import { REACTIONS } from '@/src/chem/reactions'
@@ -46,6 +46,20 @@ export function LabToolbar() {
   const addPendingReactant = useStore((s) => s.addPendingReactant)
   const clearPendingReactants = useStore((s) => s.clearPendingReactants)
   const setLastAddedLibId = useStore((s) => s.setLastAddedLibId)
+  const dismissHint = useStore((s) => s.dismissHint)
+  const clearDismissedHints = useStore((s) => s.clearDismissedHints)
+  const dismissedHintIds = useStore((s) => s.lab.dismissedHintIds)
+
+  // Auto-open the Hints sheet once per browser, so first-time visitors
+  // immediately discover the affordance. The flag is set after the open
+  // call so a hard refresh doesn't keep re-popping the sheet.
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const KEY = 'molecular.lab.hintsSeen'
+    if (window.localStorage.getItem(KEY) === '1') return
+    setHintsOpen(true)
+    window.localStorage.setItem(KEY, '1')
+  }, [])
 
   // Recipe hints are a pure derived view over scene + pending pool. The
   // useStore subscriptions trigger re-renders when either changes, and
@@ -54,10 +68,12 @@ export function LabToolbar() {
   // because Zustand immer slices replace nested objects on mutation.
   const scene = useStore((s) => s.scene)
   const pendingReactantIds = useStore((s) => s.lab.pendingReactantIds)
-  const hints = useMemo<RecipeHint[]>(
-    () => getRecipeHints({ scene, pendingReactantIds }),
-    [scene, pendingReactantIds],
-  )
+  const hints = useMemo<RecipeHint[]>(() => {
+    const all = getRecipeHints({ scene, pendingReactantIds })
+    if (dismissedHintIds.length === 0) return all
+    const dismissed = new Set(dismissedHintIds)
+    return all.filter((h) => !dismissed.has(h.reactionId))
+  }, [scene, pendingReactantIds, dismissedHintIds])
 
   // Reset clears the scene, log, and pending pool, then respawns ONE
   // instance of the last reactant the user added — preserving their recent
@@ -67,6 +83,7 @@ export function LabToolbar() {
     resetScene()
     clearReactionLog()
     clearPendingReactants()
+    clearDismissedHints()
     const lastId = useStore.getState().lab.lastAddedLibId
     const entry = (lastId && getLibraryEntry(lastId)) || getLibraryEntry('water')
     if (!entry) return
@@ -196,6 +213,7 @@ export function LabToolbar() {
                 // recipes the products enable will appear).
               }}
               onAddReactant={(libId) => add(libId)}
+              onDismiss={dismissHint}
             />
           </div>
         </SheetContent>
