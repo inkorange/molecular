@@ -180,12 +180,20 @@ export function AppShell() {
             />
             <SheetContent
               side="bottom"
-              className="h-[70vh] border-[#5cc6ff]/40 bg-[#0d0a22] p-0 text-[#dffaff] sm:h-[60vh]"
+              // Inline style wins specificity against shadcn's
+              // `data-[side=bottom]:h-auto` default. Fixed + max height pin the
+              // sheet to 60vh so the chat scrolls internally instead of
+              // pushing past the viewport top when the thread grows long.
+              style={{ height: '60vh', maxHeight: '60vh' }}
+              className="flex flex-col gap-0 overflow-hidden border-[#5cc6ff]/40 bg-[#0d0a22] p-0 text-[#dffaff]"
             >
-              <SheetTitle className="border-[#2a2655] border-b px-4 py-3 text-xs font-extrabold uppercase tracking-[0.25em] text-[#dffaff]">
+              <SheetTitle className="shrink-0 border-[#2a2655] border-b px-4 py-3 text-xs font-extrabold uppercase tracking-[0.25em] text-[#dffaff]">
                 Chemistry tutor
               </SheetTitle>
-              <div className="flex h-[calc(100%-2.75rem)] flex-col">
+              {/* min-h-0 + flex-1 lets the TutorPanel claim the remaining
+                  height without overflowing the sheet. TutorPanel's internal
+                  message list owns the overflow-y-auto. */}
+              <div className="min-h-0 flex-1">
                 <TutorPanel />
               </div>
             </SheetContent>
