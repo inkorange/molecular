@@ -369,66 +369,73 @@ export function Atom({ Z, position, atomId, showLabel = true, scale = 1, opacity
         // it to face camera, but its world position respects depth-testing so cards
         // behind atoms get correctly occluded.
         <Billboard ref={cardRef} position={[0, NUCLEUS_RADIUS + 0.22, 0]}>
-          {/* Card background */}
-          <mesh>
-            <planeGeometry args={[CARD_W, CARD_H]} />
-            <meshBasicMaterial color="#0d0a22" transparent opacity={0.88} toneMapped={false} />
-          </mesh>
-          {/* Category accent strip on the left edge */}
-          <mesh position={[-CARD_W / 2 + CARD_ACCENT_W / 2, 0, 0.001]}>
-            <planeGeometry args={[CARD_ACCENT_W, CARD_H]} />
-            <meshBasicMaterial
-              color={CATEGORY_ACCENT[el.category]}
-              transparent
-              opacity={0.75}
-              toneMapped={false}
-            />
-          </mesh>
-          {/* Atomic number (top-left) */}
-          <Text
-            position={[-CARD_W / 2 + 0.1, CARD_H / 2 - 0.06, 0.002]}
-            fontSize={0.05}
-            color="#8d92b8"
-            anchorX="left"
-            anchorY="middle"
-            material-toneMapped={false}
-          >
-            {el.Z}
-          </Text>
-          {/* Symbol (large, center) */}
-          <Text
-            position={[0, 0.04, 0.002]}
-            fontSize={0.17}
-            color="#dffaff"
-            anchorX="center"
-            anchorY="middle"
-            fontWeight="bold"
-            material-toneMapped={false}
-          >
-            {el.symbol}
-          </Text>
-          {/* Name */}
-          <Text
-            position={[0, -0.13, 0.002]}
-            fontSize={0.048}
-            color="#9aa0c8"
-            anchorX="center"
-            anchorY="middle"
-            material-toneMapped={false}
-          >
-            {el.name}
-          </Text>
-          {/* Mass */}
-          <Text
-            position={[0, -0.21, 0.002]}
-            fontSize={0.042}
-            color="#6a6f95"
-            anchorX="center"
-            anchorY="middle"
-            material-toneMapped={false}
-          >
-            {el.mass.toFixed(2)}
-          </Text>
+          {/* Push the entire card forward in Billboard-local +z (which points
+              at the camera). Without this the card sat on the plane through
+              the atom's center and any bond passing behind the atom could
+              intersect the card visually. 0.45u puts it comfortably in
+              front of nearby bond tubes. */}
+          <group position={[0, 0, 0.45]}>
+            {/* Card background */}
+            <mesh>
+              <planeGeometry args={[CARD_W, CARD_H]} />
+              <meshBasicMaterial color="#0d0a22" transparent opacity={0.88} toneMapped={false} />
+            </mesh>
+            {/* Category accent strip on the left edge */}
+            <mesh position={[-CARD_W / 2 + CARD_ACCENT_W / 2, 0, 0.001]}>
+              <planeGeometry args={[CARD_ACCENT_W, CARD_H]} />
+              <meshBasicMaterial
+                color={CATEGORY_ACCENT[el.category]}
+                transparent
+                opacity={0.75}
+                toneMapped={false}
+              />
+            </mesh>
+            {/* Atomic number (top-left) */}
+            <Text
+              position={[-CARD_W / 2 + 0.1, CARD_H / 2 - 0.06, 0.002]}
+              fontSize={0.05}
+              color="#8d92b8"
+              anchorX="left"
+              anchorY="middle"
+              material-toneMapped={false}
+            >
+              {el.Z}
+            </Text>
+            {/* Symbol (large, center) */}
+            <Text
+              position={[0, 0.04, 0.002]}
+              fontSize={0.17}
+              color="#dffaff"
+              anchorX="center"
+              anchorY="middle"
+              fontWeight="bold"
+              material-toneMapped={false}
+            >
+              {el.symbol}
+            </Text>
+            {/* Name */}
+            <Text
+              position={[0, -0.13, 0.002]}
+              fontSize={0.048}
+              color="#9aa0c8"
+              anchorX="center"
+              anchorY="middle"
+              material-toneMapped={false}
+            >
+              {el.name}
+            </Text>
+            {/* Mass */}
+            <Text
+              position={[0, -0.21, 0.002]}
+              fontSize={0.042}
+              color="#6a6f95"
+              anchorX="center"
+              anchorY="middle"
+              material-toneMapped={false}
+            >
+              {el.mass.toFixed(2)}
+            </Text>
+          </group>
         </Billboard>
       )}
 
