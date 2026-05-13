@@ -1,5 +1,6 @@
 'use client'
 
+import { ArrowUpRight } from 'lucide-react'
 import Link from 'next/link'
 import { DEMOS } from '@/src/data/demonstrations'
 
@@ -105,7 +106,7 @@ export function DemoShowcase() {
                   style={{ color }}
                 >
                   Play
-                  <span className="text-sm leading-none">↗</span>
+                  <ArrowUpRight className="h-4 w-4" strokeWidth={2.5} />
                 </span>
               </Link>
             )
@@ -121,7 +122,7 @@ export function DemoShowcase() {
             }}
           >
             View all demonstrations
-            <span className="text-lg leading-none">↗</span>
+            <ArrowUpRight className="h-5 w-5" strokeWidth={2.5} />
           </Link>
         </div>
       </div>

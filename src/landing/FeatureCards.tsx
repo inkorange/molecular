@@ -1,6 +1,7 @@
 'use client'
 
 import { PerspectiveCamera } from '@react-three/drei'
+import { ArrowUpRight } from 'lucide-react'
 import Link from 'next/link'
 import { useMemo } from 'react'
 import { type Atom, atomId, type Bond, bondId, moleculeId } from '@/src/chem/types'
@@ -83,40 +84,42 @@ const CARDS = [
 export function FeatureCards() {
   return (
     <section className="px-6 py-16 md:px-12 md:py-24">
-      <h2 className="mb-10 font-extrabold text-3xl uppercase tracking-tight md:text-5xl">
-        <span
-          className="bg-clip-text text-transparent"
-          style={{
-            backgroundImage: 'linear-gradient(90deg, #5cc6ff 0%, #ec59b6 50%, #ffd97a 100%)',
-          }}
-        >
-          Three ways to learn
-        </span>
-      </h2>
-      <div className="grid gap-6 md:grid-cols-3">
-        {CARDS.map((c) => (
-          <Link
-            key={c.id}
-            href={c.href}
-            className="group flex flex-col rounded-xl border border-[#2a2655] bg-[#0d0a22]/60 p-4 transition-colors hover:border-[#5cc6ff]/40"
+      <div className="mx-auto max-w-6xl">
+        <h2 className="mb-10 font-extrabold text-3xl uppercase tracking-tight md:text-5xl">
+          <span
+            className="bg-clip-text text-transparent"
+            style={{
+              backgroundImage: 'linear-gradient(90deg, #5cc6ff 0%, #ec59b6 50%, #ffd97a 100%)',
+            }}
           >
-            <MiniPreview libraryId={c.libraryId} />
-            <h3 className="mt-4 font-bold text-[#dffaff] text-xl">{c.title}</h3>
-            <p className="mt-2 text-[#9aa0c8] text-sm">{c.body}</p>
-            {/* In-card CTA pill — matches the gameplay button vocabulary so
+            Three ways to learn
+          </span>
+        </h2>
+        <div className="grid gap-6 md:grid-cols-3">
+          {CARDS.map((c) => (
+            <Link
+              key={c.id}
+              href={c.href}
+              className="group flex flex-col rounded-xl border border-[#2a2655] bg-[#0d0a22]/60 p-4 transition-colors hover:border-[#5cc6ff]/40"
+            >
+              <MiniPreview libraryId={c.libraryId} />
+              <h3 className="mt-4 font-bold text-[#dffaff] text-xl">{c.title}</h3>
+              <p className="mt-2 text-[#9aa0c8] text-sm">{c.body}</p>
+              {/* In-card CTA pill — matches the gameplay button vocabulary so
                 the card reads as "tap to open" rather than just a label. The
                 whole card is the clickable target; this is a visual badge. */}
-            <span
-              className="button-glow mt-4 inline-flex min-h-[36px] items-center justify-center gap-2 self-start rounded-full px-4 py-1 font-extrabold text-white text-xs uppercase tracking-wider transition-transform group-hover:scale-105"
-              style={{
-                background: 'linear-gradient(90deg, #5cc6ff 0%, #ec59b6 50%, #ffd97a 100%)',
-              }}
-            >
-              Open {c.title}
-              <span className="text-sm leading-none">↗</span>
-            </span>
-          </Link>
-        ))}
+              <span
+                className="button-glow mt-4 inline-flex min-h-[36px] items-center justify-center gap-2 self-start rounded-full px-4 py-1 font-extrabold text-white text-xs uppercase tracking-wider transition-transform group-hover:scale-105"
+                style={{
+                  background: 'linear-gradient(90deg, #5cc6ff 0%, #ec59b6 50%, #ffd97a 100%)',
+                }}
+              >
+                Open {c.title}
+                <ArrowUpRight className="h-4 w-4" strokeWidth={2.5} />
+              </span>
+            </Link>
+          ))}
+        </div>
       </div>
     </section>
   )
