@@ -1,13 +1,16 @@
 'use client'
 
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Sheet, SheetContent, SheetTitle, SheetTrigger } from '@/components/ui/sheet'
+import { REACTIONS } from '@/src/chem/reactions'
 import { getLibraryEntry } from '@/src/data/molecules'
-import { tryReact } from '@/src/lib/applyReaction'
+import { applyReaction, tryReact } from '@/src/lib/applyReaction'
+import { getRecipeHints, type RecipeHint } from '@/src/lib/recipeHints'
 import { spawnLibraryEntry } from '@/src/lib/spawn'
 import { useStore } from '@/src/store'
 import { ReactionLog } from './ReactionLog'
+import { RecipeHintPanel } from './RecipeHintPanel'
 
 // Curated reactant palette. Library IDs that appear as reactants in
 // src/chem/reactions.ts and have decent visual / interaction value in Lab.
@@ -34,6 +37,7 @@ const MORE_REACTANTS: { id: string; label: string }[] = [
 export function LabToolbar() {
   const [logOpen, setLogOpen] = useState(false)
   const [reactantsOpen, setReactantsOpen] = useState(false)
+  const [hintsOpen, setHintsOpen] = useState(false)
   const addAtom = useStore((s) => s.addAtom)
   const addBond = useStore((s) => s.addBond)
   const addMolecule = useStore((s) => s.addMolecule)
@@ -42,6 +46,18 @@ export function LabToolbar() {
   const addPendingReactant = useStore((s) => s.addPendingReactant)
   const clearPendingReactants = useStore((s) => s.clearPendingReactants)
   const setLastAddedLibId = useStore((s) => s.setLastAddedLibId)
+
+  // Recipe hints are a pure derived view over scene + pending pool. The
+  // useStore subscriptions trigger re-renders when either changes, and
+  // useMemo memoises the ranker output so we don't recompute on unrelated
+  // re-renders. Scene snapshot reference equality is enough to invalidate
+  // because Zustand immer slices replace nested objects on mutation.
+  const scene = useStore((s) => s.scene)
+  const pendingReactantIds = useStore((s) => s.lab.pendingReactantIds)
+  const hints = useMemo<RecipeHint[]>(
+    () => getRecipeHints({ scene, pendingReactantIds }),
+    [scene, pendingReactantIds],
+  )
 
   // Reset clears the scene, log, and pending pool, then respawns ONE
   // instance of the last reactant the user added — preserving their recent
@@ -87,6 +103,16 @@ export function LabToolbar() {
 
   function react() {
     tryReact({ pendingOnly: true })
+  }
+
+  // Fire a specific hinted reaction. We pass the hint's pre-matched molecule
+  // ids directly to applyReaction rather than going through tryReact — this
+  // avoids the situation where two recipes might be simultaneously satisfied
+  // by the scene and the wrong one fires.
+  function combineHint(hint: RecipeHint) {
+    const reaction = REACTIONS.find((r) => r.id === hint.reactionId)
+    if (!reaction || hint.matchedMoleculeIds.length === 0) return
+    applyReaction(reaction, hint.matchedMoleculeIds)
   }
 
   return (
@@ -139,6 +165,38 @@ export function LabToolbar() {
                 + {r.label}
               </button>
             ))}
+          </div>
+        </SheetContent>
+      </Sheet>
+      <Sheet open={hintsOpen} onOpenChange={setHintsOpen}>
+        <SheetTrigger
+          render={
+            <Button
+              size="sm"
+              className="min-h-[40px] border border-[#ffd97a]/50 bg-[#14112e] font-bold text-[#ffd97a] hover:bg-[#1a163a]"
+            >
+              💡 Hints
+              {hints.some((h) => h.status === 'ready') && (
+                <span className="ml-1 inline-block h-2 w-2 rounded-full bg-[#a4ff8c]" />
+              )}
+            </Button>
+          }
+        />
+        <SheetContent side="right" className="border-[#2a2655] bg-[#0d0a22] text-[#dffaff]">
+          <SheetTitle className="px-3 pt-3 text-sm font-bold uppercase tracking-wider text-[#9aa0c8]">
+            Reaction hints
+          </SheetTitle>
+          <div className="min-h-0 flex-1 overflow-y-auto">
+            <RecipeHintPanel
+              hints={hints}
+              onCombine={(hint) => {
+                combineHint(hint)
+                // Leave the sheet open so the user can see the panel update
+                // (the just-fired reaction's card will fall off and any new
+                // recipes the products enable will appear).
+              }}
+              onAddReactant={(libId) => add(libId)}
+            />
           </div>
         </SheetContent>
       </Sheet>
