@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { Dialog, DialogContent, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { Drawer, DrawerContent, DrawerTitle, DrawerTrigger } from '@/components/ui/drawer'
+import { Sheet, SheetContent, SheetTitle, SheetTrigger } from '@/components/ui/sheet'
 import { freeCapacity } from '@/src/chem/rules'
 import type { AtomId } from '@/src/chem/types'
 import { useStore } from '@/src/store'
@@ -12,6 +13,7 @@ import { LabToolbar } from '@/src/ui/LabToolbar'
 import { LibraryBrowser } from '@/src/ui/LibraryBrowser'
 import { ModeSwitcher } from '@/src/ui/ModeSwitcher'
 import { PeriodicSidebar } from '@/src/ui/PeriodicSidebar'
+import { TutorPanel } from '@/src/ui/TutorPanel'
 import { ValidityBar } from '@/src/ui/ValidityBar'
 import { AppScene } from './AppScene'
 
@@ -20,6 +22,7 @@ const VALID_MODES = new Set<Mode>(['explore', 'build', 'lab'])
 export function AppShell() {
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [inspectorOpen, setInspectorOpen] = useState(false)
+  const [tutorOpen, setTutorOpen] = useState(false)
   const mode = useStore((s) => s.scene.mode)
   const resetScene = useStore((s) => s.resetScene)
   const clearHeld = useStore((s) => s.clearHeld)
@@ -161,6 +164,32 @@ export function AppShell() {
               </div>
             </DialogContent>
           </Dialog>
+          {/* Tutor — streaming AI chat keyed to the current scene + tier + mode.
+              Distinct gold/purple gradient so it doesn't read as "another Info". */}
+          <Sheet open={tutorOpen} onOpenChange={setTutorOpen}>
+            <SheetTrigger
+              render={
+                <button
+                  type="button"
+                  className="inline-flex min-h-[40px] items-center gap-1 rounded-full px-4 py-1.5 text-xs font-extrabold uppercase tracking-wider text-white shadow-[0_0_18px_rgba(255,217,122,0.45)] transition-transform hover:scale-105 active:scale-95"
+                  style={{ background: 'linear-gradient(135deg, #ffd97a 0%, #ec59b6 100%)' }}
+                >
+                  Tutor
+                </button>
+              }
+            />
+            <SheetContent
+              side="bottom"
+              className="h-[70vh] border-[#5cc6ff]/40 bg-[#0d0a22] p-0 text-[#dffaff] sm:h-[60vh]"
+            >
+              <SheetTitle className="border-[#2a2655] border-b px-4 py-3 text-xs font-extrabold uppercase tracking-[0.25em] text-[#dffaff]">
+                Chemistry tutor
+              </SheetTitle>
+              <div className="flex h-[calc(100%-2.75rem)] flex-col">
+                <TutorPanel />
+              </div>
+            </SheetContent>
+          </Sheet>
         </div>
       </header>
 
