@@ -2,11 +2,14 @@
 
 import { PerspectiveCamera } from '@react-three/drei'
 import Link from 'next/link'
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
+import type { Atom as AtomData, Bond as BondData } from '@/src/chem/types'
 import type { Demonstration } from '@/src/data/demonstrations'
 import { Molecule } from '@/src/scene/Molecule'
 import { Scene } from '@/src/scene/Scene'
+import { AnimatedMolecule } from './AnimatedMolecule'
 import { buildIngredientScene, buildProductScene, getReactionMetadata } from './buildDemoScene'
+import { ReactionEffect } from './ReactionEffect'
 
 type Level = 'elementary' | 'advanced'
 type Step = 'ingredients' | 'combine' | 'results'
@@ -18,6 +21,10 @@ const STEP_LABEL: Record<Step, string> = {
   combine: 'Combine',
   results: 'Results',
 }
+
+// Length of the ingredients→combine transition. Long enough for the
+// merge motion and effect burst to read clearly without dragging.
+const TRANSITION_MS = 1400
 
 const REACTION_TYPE_COLOR: Record<string, string> = {
   synthesis: '#5cc6ff',
@@ -41,24 +48,32 @@ interface DemoPlayerProps {
  */
 export function DemoPlayer({ demo, initialLevel }: DemoPlayerProps) {
   const [step, setStep] = useState<Step>('ingredients')
+  // While transitioning, `step` is the OUTGOING step (ingredients) and
+  // `pendingStep` is the incoming one (combine). The render path uses
+  // both to draw exiting + entering scenes at once + the effect overlay.
+  const [transitionStartedAt, setTransitionStartedAt] = useState<number | null>(null)
   const [level] = useState<Level>(initialLevel)
   const [shareToast, setShareToast] = useState<string | null>(null)
 
   const reaction = useMemo(() => getReactionMetadata(demo.reactionId), [demo.reactionId])
-
-  // Both scenes are built once and switched between. Atoms/bonds carry
-  // unique ids per build so React keys flip when we swap steps — this
-  // makes the Atom components mount fresh and replay their spawn-in.
   const ingredientScene = useMemo(() => buildIngredientScene(demo.ingredients), [demo.ingredients])
   const productScene = useMemo(() => buildProductScene(demo), [demo])
 
-  // Ingredients step shows reactants. Combine + Results both show products
-  // (combine adds an effects layer on top — added in the next commit).
-  const currentScene = step === 'ingredients' ? ingredientScene : productScene
+  // Group atoms by moleculeId so each unit can animate independently
+  // (e.g. each H₂ molecule shrinks toward origin on its own).
+  const ingredientUnits = useMemo(
+    () => groupByMolecule(ingredientScene.atoms, ingredientScene.bonds),
+    [ingredientScene],
+  )
+  const productUnits = useMemo(
+    () => groupByMolecule(productScene.atoms, productScene.bonds),
+    [productScene],
+  )
 
+  const isTransitioning = transitionStartedAt !== null
   const stepIndex = STEP_ORDER.indexOf(step)
-  const canPrev = stepIndex > 0
-  const canNext = stepIndex < STEP_ORDER.length - 1
+  const canPrev = stepIndex > 0 && !isTransitioning
+  const canNext = stepIndex < STEP_ORDER.length - 1 && !isTransitioning
 
   function goPrev() {
     if (canPrev) {
@@ -67,11 +82,29 @@ export function DemoPlayer({ demo, initialLevel }: DemoPlayerProps) {
     }
   }
   function goNext() {
-    if (canNext) {
-      const next = STEP_ORDER[stepIndex + 1]
-      if (next) setStep(next)
+    if (!canNext) return
+    // The ingredients → combine hop is the visually meaningful transition
+    // that warrants the merge motion + effect overlay. Other hops are
+    // just text + scene swaps.
+    if (step === 'ingredients') {
+      setTransitionStartedAt(performance.now())
+      return
     }
+    const next = STEP_ORDER[stepIndex + 1]
+    if (next) setStep(next)
   }
+
+  // When a transition is running, schedule the step swap to land at the
+  // end of the animation window. Cleanup cancels the pending swap if the
+  // user navigates away mid-transition.
+  useEffect(() => {
+    if (!isTransitioning) return
+    const t = window.setTimeout(() => {
+      setStep('combine')
+      setTransitionStartedAt(null)
+    }, TRANSITION_MS)
+    return () => window.clearTimeout(t)
+  }, [isTransitioning])
 
   async function share() {
     const url = `${window.location.origin}/demo/${demo.id}?level=${level}`
@@ -89,13 +122,50 @@ export function DemoPlayer({ demo, initialLevel }: DemoPlayerProps) {
 
   return (
     <div className="relative h-dvh w-screen overflow-hidden bg-[#07051a]">
-      {/* Full-bleed 3D scene */}
+      {/* Full-bleed 3D scene. Three render modes share one canvas:
+            - ingredients: render reactant units, idle.
+            - transitioning: ingredient units shrink toward origin (exiting)
+              while product units grow from origin (entering), plus the
+              reaction-type effect overlay bursts at center.
+            - combine/results: render product units idle. */}
       <div className="absolute inset-0">
         <Scene interactive={false}>
           <PerspectiveCamera makeDefault position={[0, 0, 7]} fov={45} />
-          <group>
-            <Molecule atoms={currentScene.atoms} bonds={currentScene.bonds} />
-          </group>
+          {step === 'ingredients' && !isTransitioning && (
+            <Molecule atoms={ingredientScene.atoms} bonds={ingredientScene.bonds} />
+          )}
+          {isTransitioning && transitionStartedAt !== null && (
+            <>
+              {ingredientUnits.map((unit) => (
+                <AnimatedMolecule
+                  key={`exit-${unit.atoms[0]?.moleculeId ?? unit.atoms[0]?.id}`}
+                  atoms={unit.atoms}
+                  bonds={unit.bonds}
+                  phase="exiting"
+                  phaseStartedAt={transitionStartedAt}
+                  durationMs={TRANSITION_MS}
+                />
+              ))}
+              {productUnits.map((unit) => (
+                <AnimatedMolecule
+                  key={`enter-${unit.atoms[0]?.moleculeId ?? unit.atoms[0]?.id}`}
+                  atoms={unit.atoms}
+                  bonds={unit.bonds}
+                  phase="entering"
+                  phaseStartedAt={transitionStartedAt}
+                  durationMs={TRANSITION_MS}
+                />
+              ))}
+              <ReactionEffect
+                kind={demo.effectKind}
+                phaseStartedAt={transitionStartedAt}
+                durationMs={TRANSITION_MS}
+              />
+            </>
+          )}
+          {(step === 'combine' || step === 'results') && !isTransitioning && (
+            <Molecule atoms={productScene.atoms} bonds={productScene.bonds} />
+          )}
         </Scene>
       </div>
 
@@ -198,4 +268,31 @@ export function DemoPlayer({ demo, initialLevel }: DemoPlayerProps) {
       )}
     </div>
   )
+}
+
+interface MoleculeUnit {
+  atoms: AtomData[]
+  bonds: BondData[]
+}
+
+/**
+ * Split a flat atoms+bonds payload into per-moleculeId units so each unit
+ * can animate independently. Used by the transition path: every reactant
+ * "unit" (one library-spawned molecule, or one bare atom) drifts toward
+ * origin under its own AnimatedMolecule.
+ */
+function groupByMolecule(atoms: AtomData[], bonds: BondData[]): MoleculeUnit[] {
+  const byMol = new Map<string, MoleculeUnit>()
+  for (const a of atoms) {
+    const key = a.moleculeId as unknown as string
+    if (!byMol.has(key)) byMol.set(key, { atoms: [], bonds: [] })
+    byMol.get(key)?.atoms.push(a)
+  }
+  for (const b of bonds) {
+    const owner = atoms.find((a) => a.id === b.atomA)
+    if (!owner) continue
+    const key = owner.moleculeId as unknown as string
+    byMol.get(key)?.bonds.push(b)
+  }
+  return [...byMol.values()]
 }
