@@ -38,3 +38,33 @@ The teacher can share the link with it already selected. the share links can jus
 
 teachers can builkd thier own step by step interactions for demonstration to thier students, making it shareable, but thats a future enhancement
 
+** DONE **
+
+## Periodic table of Elements Explorer
+
+### Description
+
+An interactive periodic Table of elements that allows users to click on one of the elements form the table, as it is traditionally shown to students. When they click the element, we get a 3d representation of the model using our current 3d rendering engine, with the electrons swirling around.
+
+The idea is an educational tour of the periodic table of elements. Along with the rendering of the atom, we also supply atomic data on the element, as well as some information about where we use the element, how it's formed, and other info for students.
+
+### Routing
+
+The url path should be /elements for the initial landing page with just the periodic table. Then when one is clicked, the url path is /elements/[element_name_slug]
+
+But clicking an element doesnt refresh the page, it just changes the location, we want the transition from clikcing the element form the table to the detail to be anmated and smooth in the scene.
+
+### UX
+
+On the homepage, I wanta full section dedicated to this feature, with images of the periodic table shown, as well as some example 3d renderings of the more complex elements, which might make for a more striking 3d visualization.
+
+On the periodic table page, we will present an interactive Periodic table of Elements, which as the user hovers over one, the card slightly increases in size to indicate you can click it. When the user clicks the element item, it zooms in and we show the traditional Element card, but within it, a 3d rendering of the element -- using the same 3d visualization tools we already have build for this for our molecules.
+
+The element 3d viz should also show protons and any other sub-atomic elements animated and flying around, or in the core atom.
+
+We might wnat tio consider now making the core atom circle a litte more fuzzy at the edges, instead of a hard circle (globally). But for this page only, we will render the other sub-atomic particles, and having the circle atom shape be a little more transparent, we can see other sub atmic particles inside it swirling around based on the atom's atomic numbers.
+
+When an element is selected, below it, a card with all the information about the element in shown for educational purposes. If we have molecules in our database that uses this element, we should have a section that says, "See Related Molecules", where all of the molecules are listed that contain this element, clicking on goes right to the /app page with the molecule loaded.
+
+
+

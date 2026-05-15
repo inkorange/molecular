@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 import { DemoShowcase } from '@/src/landing/DemoShowcase'
+import { ElementsShowcase } from '@/src/landing/ElementsShowcase'
 import { FeatureCards } from '@/src/landing/FeatureCards'
 import { Footer } from '@/src/landing/Footer'
 import { HeroCopy } from '@/src/landing/HeroCopy'
@@ -47,6 +48,7 @@ export default function HomePage() {
         <HomepageReel />
         <HeroCopy />
       </section>
+      <ElementsShowcase />
       <FeatureCards />
       <DemoShowcase />
       <HowItWorks />

@@ -7,6 +7,9 @@ export interface UiSliceState {
     inspectorOpen: boolean
     tutorOpen: boolean
     fullTableOpen: boolean
+    /** Atom whose element-detail prompt popup is currently open above
+     *  its periodic-card label. Null when no popup is showing. */
+    elementPopupAtomId: string | null
   }
 }
 
@@ -15,6 +18,8 @@ export interface UiSliceActions {
   toggleInspector: () => void
   toggleTutor: () => void
   toggleFullTable: () => void
+  openElementPopup: (atomId: string) => void
+  closeElementPopup: () => void
 }
 
 export type UiSlice = UiSliceState & UiSliceActions
@@ -25,6 +30,7 @@ export const createUiSlice: StateCreator<UiSlice> = (set) => ({
     inspectorOpen: true,
     tutorOpen: false,
     fullTableOpen: false,
+    elementPopupAtomId: null,
   },
   toggleSidebar: () =>
     set(
@@ -48,6 +54,18 @@ export const createUiSlice: StateCreator<UiSlice> = (set) => ({
     set(
       produce<UiSlice>((s) => {
         s.ui.fullTableOpen = !s.ui.fullTableOpen
+      }),
+    ),
+  openElementPopup: (atomId) =>
+    set(
+      produce<UiSlice>((s) => {
+        s.ui.elementPopupAtomId = atomId
+      }),
+    ),
+  closeElementPopup: () =>
+    set(
+      produce<UiSlice>((s) => {
+        s.ui.elementPopupAtomId = null
       }),
     ),
 })
