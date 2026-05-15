@@ -5,8 +5,18 @@ on:
     branches: [main]
   pull_request:
 
+# Cancel earlier in-flight runs when a new commit lands on the same PR /
+# branch — most of the verify cost is the e2e step, so we'd rather pay
+# it once for the latest SHA than serially for every push.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
-  verify:
+  # Static checks — biome + tsc. Cheap; runs in parallel with the others
+  # so total wall time is whichever job is slowest (currently e2e).
+  static:
+    name: lint + typecheck
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -26,8 +36,81 @@ jobs:
 
       - run: pnpm typecheck
 
+  unit:
+    name: unit tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
       - run: pnpm test
 
-      - run: pnpm dlx playwright install --with-deps chromium
+  e2e:
+    name: e2e (playwright)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      # Cache the Playwright browser binaries (Chromium ~150MB) keyed on
+      # the playwright package version. On cache hit we skip the download
+      # entirely; on miss we re-download but only the version changed.
+      - name: Resolve Playwright version
+        id: pwver
+        run: |
+          version=$(node -p "require('./node_modules/@playwright/test/package.json').version")
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/cache@v4
+        id: pw-cache
+        with:
+          path: ~/.cache/ms-playwright
+          key: pw-${{ runner.os }}-${{ steps.pwver.outputs.version }}
+
+      # Skip --with-deps: ubuntu-latest already ships every system lib
+      # Chromium needs. The flag was adding ~30s of apt-get for nothing.
+      - if: steps.pw-cache.outputs.cache-hit != 'true'
+        run: pnpm exec playwright install chromium
+
+      # Cache the Next.js build output. Most PRs only touch a few routes,
+      # so reusing .next/cache cuts build time meaningfully. Key on the
+      # commit SHA for freshness, fall back to the branch and main.
+      - uses: actions/cache@v4
+        with:
+          path: .next/cache
+          key: next-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}-${{ github.sha }}
+          restore-keys: |
+            next-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}-
+            next-${{ runner.os }}-
 
       - run: pnpm test:e2e
+
+      # Upload the HTML report on failure so the cause is one click away
+      # without re-running locally. Trace files are also included thanks
+      # to `trace: 'on-first-retry'` in playwright.config.ts.
+      - if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: playwright-report
+          retention-days: 7
