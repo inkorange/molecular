@@ -1,7 +1,9 @@
 'use client'
 
-import { Billboard, Text } from '@react-three/drei'
+import { Billboard, Html, Text } from '@react-three/drei'
 import { type ThreeEvent, useFrame, useThree } from '@react-three/fiber'
+import { ArrowUpRight } from 'lucide-react'
+import Link from 'next/link'
 import { useEffect, useMemo, useRef } from 'react'
 import {
   AdditiveBlending,
@@ -17,6 +19,7 @@ import {
 import { getElement } from '@/src/chem/elements'
 import { freeCapacity } from '@/src/chem/rules'
 import type { AtomId, ElementCategory } from '@/src/chem/types'
+import { getPeriodicElement } from '@/src/data/elementsFull'
 import { usePointerToWorld } from '@/src/lib/usePointerToWorld'
 import { useReducedMotion } from '@/src/lib/useReducedMotion'
 import { useStore } from '@/src/store'
@@ -132,6 +135,17 @@ export function Atom({ Z, position, atomId, showLabel = true, scale = 1, opacity
   const cancelConnecting = useStore((s) => s.cancelConnecting)
   const connectAtoms = useStore((s) => s.connectAtoms)
   const moveAtom = useStore((s) => s.moveAtom)
+  // Element-detail popup. Opens when the user taps the periodic card
+  // floating above the atom; gives them a one-click path into the
+  // /elements/[slug] page.
+  const elementPopupAtomId = useStore((s) => s.ui.elementPopupAtomId)
+  const openElementPopup = useStore((s) => s.openElementPopup)
+  const closeElementPopup = useStore((s) => s.closeElementPopup)
+  const popupOpen = atomId !== undefined && elementPopupAtomId === atomId
+  // /elements/[slug] uses the standalone periodic-table dataset, which
+  // has its own slugs (independent from chem/elements). Look up here so
+  // the popup has a stable href.
+  const periodicSlug = useMemo(() => getPeriodicElement(Z)?.slug ?? null, [Z])
   const inBuild = mode === 'build'
   const isConnectingSource = inBuild && atomId !== undefined && atomId === connectingFromAtomId
   // A connect target glows only if it has free valence — atoms already at
@@ -383,7 +397,21 @@ export function Atom({ Z, position, atomId, showLabel = true, scale = 1, opacity
               the atom's center and any bond passing behind the atom could
               intersect the card visually. 0.45u puts it comfortably in
               front of nearby bond tubes. */}
-          <group position={[0, 0, 0.45]}>
+          {/* Card click — opens the "Go to Element Detail" popup. Skipped
+              when this atom has no atomId (DragGhost preview) or has no
+              matching slug in the periodic dataset. */}
+          {/* biome-ignore lint/a11y/noStaticElementInteractions: R3F <group> is a 3D scene node, not a DOM element */}
+          <group
+            position={[0, 0, 0.45]}
+            onClick={
+              atomId !== undefined && periodicSlug
+                ? (e) => {
+                    e.stopPropagation()
+                    openElementPopup(atomId)
+                  }
+                : undefined
+            }
+          >
             {/* Card background */}
             <mesh>
               <planeGeometry args={[CARD_W, CARD_H]} />
@@ -445,6 +473,20 @@ export function Atom({ Z, position, atomId, showLabel = true, scale = 1, opacity
               {el.mass.toFixed(2)}
             </Text>
           </group>
+
+          {/* "Go to Element Detail" popup — billboard-locked so it always
+              sits to the right of the card regardless of camera orbit.
+              Lives inside <Billboard> so it inherits both the camera
+              rotation and the per-frame distance-scale that keeps the
+              card at constant screen size. */}
+          {popupOpen && periodicSlug && (
+            <ElementDetailPopup
+              slug={periodicSlug}
+              symbol={el.symbol}
+              name={el.name}
+              onClose={closeElementPopup}
+            />
+          )}
         </Billboard>
       )}
 
@@ -479,5 +521,72 @@ export function Atom({ Z, position, atomId, showLabel = true, scale = 1, opacity
         )
       })}
     </group>
+  )
+}
+
+/**
+ * Tap-the-card → element-detail prompt. Renders as an HTML overlay
+ * anchored just above the atom's billboard via drei's <Html>. Clicking
+ * anywhere on the popup itself navigates to /elements/[slug]; clicking
+ * anywhere else in the page closes it.
+ *
+ * Click-outside is wired with a document `pointerdown` listener attached
+ * in a useEffect — the listener is registered AFTER the click that
+ * opened the popup has finished propagating, so the open event never
+ * counts as an "outside" click.
+ */
+function ElementDetailPopup({
+  slug,
+  symbol,
+  name,
+  onClose,
+}: {
+  slug: string
+  symbol: string
+  name: string
+  onClose: () => void
+}) {
+  const popupRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    function handlePointerDown(e: PointerEvent) {
+      if (popupRef.current && !popupRef.current.contains(e.target as Node)) {
+        onClose()
+      }
+    }
+    document.addEventListener('pointerdown', handlePointerDown)
+    return () => document.removeEventListener('pointerdown', handlePointerDown)
+  }, [onClose])
+
+  return (
+    <Html
+      // Right of card in Billboard-local coords. CARD_W/2 is the card's
+      // right edge; +0.08 leaves a small visual gap. Z matches the card's
+      // forward push so depth-test reads the same. Because we're inside
+      // the <Billboard>, this position is rotated to face the camera —
+      // the popup always sits to the right of the card on screen.
+      position={[CARD_W / 2 + 0.08, 0, 0.45]}
+      zIndexRange={[400, 300]}
+      style={{ pointerEvents: 'auto' }}
+    >
+      {/* Inner wrapper shifts the popup up by half its own height so its
+          vertical center aligns with the card's vertical center (the
+          anchor point). We don't use Html's `center` prop because that
+          centers BOTH axes and we want the left edge — not the
+          horizontal center — pinned to the anchor. */}
+      <div ref={popupRef} style={{ transform: 'translateY(-50%)' }}>
+        <Link
+          href={`/elements/${slug}`}
+          className="flex min-w-[180px] items-center gap-2 rounded-lg border border-[#5cc6ff]/60 bg-[#0d0a22]/95 px-4 py-2.5 font-extrabold text-[#dffaff] text-xs uppercase tracking-wider shadow-[0_8px_24px_rgba(0,0,0,0.5)] backdrop-blur transition-colors hover:border-[#5cc6ff] hover:bg-[#14112e]"
+          onClick={onClose}
+        >
+          <span className="flex h-6 w-6 items-center justify-center rounded bg-gradient-to-br from-[#5cc6ff] to-[#ec59b6] font-extrabold text-[#0d0a22] text-[10px]">
+            {symbol}
+          </span>
+          <span className="flex-1">Go to {name} details</span>
+          <ArrowUpRight className="h-4 w-4" strokeWidth={2.5} />
+        </Link>
+      </div>
+    </Html>
   )
 }

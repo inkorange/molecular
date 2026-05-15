@@ -7,6 +7,35 @@ import { type ReactNode, useEffect, useState } from 'react'
 import { type DeviceTier, detectDeviceTier } from '@/src/lib/deviceTier'
 import { MotionBlur } from './MotionBlur'
 
+/**
+ * Recovery fallback rendered when the WebGL context is lost (the
+ * browser dropped the renderer — typically because too many contexts
+ * are alive across the app, or the GPU itself crashed). Replaces the
+ * blank white screen so the user has a way out.
+ */
+function ContextLostFallback() {
+  return (
+    <div className="flex h-full w-full flex-col items-center justify-center gap-3 px-6 text-center">
+      <p className="font-extrabold text-[#dffaff] text-sm uppercase tracking-wider">
+        3D renderer lost
+      </p>
+      <p className="max-w-[320px] text-[#9aa0c8] text-xs">
+        The browser dropped the WebGL context. Reload the page to bring it back.
+      </p>
+      <button
+        type="button"
+        onClick={() => window.location.reload()}
+        className="button-glow inline-flex min-h-[40px] items-center gap-2 rounded-full px-5 py-1.5 font-extrabold text-white text-xs uppercase tracking-wider transition-transform hover:scale-105 active:scale-95"
+        style={{
+          background: 'linear-gradient(90deg, #5cc6ff 0%, #ec59b6 50%, #ffd97a 100%)',
+        }}
+      >
+        Reload
+      </button>
+    </div>
+  )
+}
+
 interface SceneProps {
   children: ReactNode
   enableBloom?: boolean
@@ -27,13 +56,56 @@ export function Scene({ children, enableBloom = true, interactive = true }: Scen
     setTier(detectDeviceTier())
   }, [])
   const useBloom = enableBloom && tier !== 'mobile-lite'
+
+  // Track context-lost events so we can swap to a recovery UI instead of
+  // letting the page go white. Browsers cap simultaneous WebGL contexts
+  // (Chrome ~16) and forcibly drop the oldest when the cap is exceeded;
+  // a hung GPU driver can also trigger this. Reload is the only reliable
+  // way to get a fresh context after the loss.
+  const [contextLost, setContextLost] = useState(false)
+  if (contextLost) return <ContextLostFallback />
+
   return (
     <Canvas
       camera={{ position: [0, 0, 6], fov: 50 }}
       dpr={[1, 2]}
-      gl={{ antialias: true, alpha: false }}
+      gl={{ antialias: true, alpha: false, powerPreference: 'high-performance' }}
       style={{
         background: 'radial-gradient(circle at 50% 50%, #1a1135 0%, #07051a 100%)',
+      }}
+      onCreated={({ gl }) => {
+        const canvas = gl.domElement
+        canvas.addEventListener(
+          'webglcontextlost',
+          (e) => {
+            // preventDefault gives the browser a chance to restore the
+            // context. We still flip to the fallback so the user has
+            // immediate feedback.
+            e.preventDefault()
+            console.warn('[Scene] WebGL context lost')
+            setContextLost(true)
+          },
+          { passive: false },
+        )
+        canvas.addEventListener('webglcontextrestored', () => {
+          console.warn('[Scene] WebGL context restored — reload still recommended')
+        })
+        // Explicitly release the GPU context when the renderer is torn
+        // down. R3F's default dispose path doesn't always free the
+        // context on its own, so navigations between pages with Canvases
+        // can accumulate live contexts until the browser cap (Chrome
+        // ~16) is hit and the OLDEST one is forcibly killed — which
+        // shows up as "WebGLRenderer: Context Lost" on the page the
+        // user just opened.
+        gl.dispose = ((orig) =>
+          function disposeWithCtxLoss(this: typeof gl) {
+            try {
+              gl.forceContextLoss()
+            } catch {
+              // ignore — context may already be lost
+            }
+            return orig.call(this)
+          })(gl.dispose)
       }}
     >
       <ambientLight intensity={0.3} />

@@ -1,5 +1,6 @@
 import type { MetadataRoute } from 'next'
 import { DEMOS } from '@/src/data/demonstrations'
+import { listElementSlugs } from '@/src/data/elementsFull'
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? 'http://localhost:3000'
 
@@ -34,6 +35,12 @@ export default function sitemap(): MetadataRoute.Sitemap {
       changeFrequency: 'monthly',
       priority: 0.8,
     },
+    {
+      url: `${SITE_URL}/elements`,
+      lastModified,
+      changeFrequency: 'monthly',
+      priority: 0.9,
+    },
   ]
 
   const demoPages: MetadataRoute.Sitemap = DEMOS.map((d) => ({
@@ -43,5 +50,12 @@ export default function sitemap(): MetadataRoute.Sitemap {
     priority: 0.7,
   }))
 
-  return [...staticPages, ...demoPages]
+  const elementPages: MetadataRoute.Sitemap = listElementSlugs().map((slug) => ({
+    url: `${SITE_URL}/elements/${slug}`,
+    lastModified,
+    changeFrequency: 'monthly',
+    priority: 0.6,
+  }))
+
+  return [...staticPages, ...demoPages, ...elementPages]
 }
