@@ -123,17 +123,19 @@ export function EnergyDisplay({ scale, label }: EnergyDisplayProps) {
       <sprite ref={spriteRef} material={spriteMaterial} scale={size} />
 
       {/* Energy magnitude — billboarded 3D text embedded inside the blob.
-          Dark outline keeps it legible against the bright core. */}
+          Dark fill on a bright outline gives it the strongest possible
+          contrast against the luminous additive cloud behind it. White
+          fill (the previous choice) lost in the white-hot core. */}
       {label && (
         <Billboard>
           <Text
-            fontSize={Math.min(0.28, 0.14 + clamped * 0.03)}
-            color="#fff5b8"
+            fontSize={Math.min(0.32, 0.18 + clamped * 0.035)}
+            color="#1a0d2a"
             anchorX="center"
             anchorY="middle"
             fontWeight="bold"
-            outlineWidth={0.012}
-            outlineColor="#3a1810"
+            outlineWidth={0.02}
+            outlineColor="#fff5b8"
             material-toneMapped={false}
           >
             {label}
