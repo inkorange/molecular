@@ -41,7 +41,18 @@ export interface Demonstration {
    * treatment in `<ReactionEffect>`: synthesis flashes bond formations,
    * combustion adds fire particles, electrolysis arcs and splits, etc.
    */
-  effectKind: 'synthesis' | 'combustion' | 'decomposition' | 'neutralization' | 'displacement'
+  effectKind:
+    | 'synthesis'
+    | 'combustion'
+    | 'decomposition'
+    | 'neutralization'
+    | 'displacement'
+    // Nuclear effect kinds. Drive a distinct VFX path in DemoPlayer
+    // (NuclearEffect) instead of the chemistry-style ReactionEffect —
+    // fusion converges + flashes inward, fission shatters outward with
+    // ejected neutrons. Visually dramatic to match the energy scale.
+    | 'fusion'
+    | 'fission'
   /**
    * Optional environmental trigger overlay. When present, the player
    * layers an additional visual on top of the reaction-type effect:
@@ -550,6 +561,87 @@ export const DEMOS: Demonstration[] = [
           'Three carbon dioxides and four waters. Same as natural gas — just bigger. Propane is what people use for off-grid heating, BBQs, and outdoor torches.',
         advanced:
           'C₃H₈ + 5 O₂ → 3 CO₂ + 4 H₂O. ΔH ≈ −2220 kJ/mol — more energy per mole than methane combustion. Standard fuel for portable heating and forklift engines.',
+      },
+    },
+  },
+  // ===== Nuclear demos =====
+  // The chemistry engine doesn't simulate nuclear reactions, so these
+  // demos use placeholder reactionIds (no matching entry in REACTIONS)
+  // and provide explicit `products` overrides. The Demo player handles
+  // the missing reaction metadata gracefully — the enthalpy badge just
+  // doesn't render.
+  //
+  // Atoms are rendered by their atomic number; isotope mass differences
+  // (deuterium vs protium, U-235 vs U-238) are explained in the step
+  // text rather than rendered, since the periodic-table data only
+  // knows the standard atomic mass.
+  {
+    id: 'nuclear-fusion',
+    title: 'Nuclear fusion',
+    summary: 'Two hydrogen nuclei slam together and become helium — like the Sun.',
+    reactionId: 'd-t-fusion',
+    reactionType: 'fusion',
+    difficulty: 5,
+    effectKind: 'fusion',
+    ingredients: [{ kind: 'atom', Z: 1, count: 2 }],
+    products: [{ kind: 'atom', Z: 2, count: 1 }],
+    steps: {
+      ingredients: {
+        elementary:
+          'Two hydrogen atoms. In the Sun, they get squeezed by gravity until they crash into each other so hard they stick together.',
+        advanced:
+          'Reactants (idealised D-T fusion): ²H (deuterium) and ³H (tritium). Coulomb repulsion between the two positive nuclei requires either extreme temperature (~100 million K) or quantum tunneling for them to fuse.',
+      },
+      combine: {
+        elementary:
+          'BAM! The two nuclei merge into a single, bigger nucleus. A tiny bit of mass turns into a huge amount of energy.',
+        advanced:
+          'The strong nuclear force binds the merged nucleus together once electrostatic repulsion is overcome. Per E = mc², about 0.7% of the input mass converts to energy — mostly carried away by a 14 MeV neutron.',
+      },
+      results: {
+        elementary:
+          'A helium atom! Plus one tiny neutron that flew off, and a TON of energy. This is exactly how the Sun makes its light.',
+        advanced:
+          '²H + ³H → ⁴He + ¹n + 17.6 MeV. The released neutron carries most of the energy. The same reaction powers thermonuclear weapons and is the target of ITER, NIF, and every commercial fusion attempt.',
+      },
+    },
+  },
+  {
+    id: 'nuclear-fission',
+    title: 'Nuclear fission',
+    summary: 'A heavy uranium nucleus splits in two — releasing energy and free neutrons.',
+    reactionId: 'u235-fission',
+    reactionType: 'fission',
+    difficulty: 5,
+    effectKind: 'fission',
+    // Bare uranium atom. A real fission event starts with U-235 absorbing
+    // a thermal neutron — we elide that incident neutron for visual
+    // clarity and explain it in the step text.
+    ingredients: [{ kind: 'atom', Z: 92, count: 1 }],
+    // Canonical Ba-141 + Kr-92 + 3 neutrons split. The 3 neutrons are
+    // rendered by NuclearEffect as ejected sprites, not as scene atoms.
+    products: [
+      { kind: 'atom', Z: 56, count: 1 },
+      { kind: 'atom', Z: 36, count: 1 },
+    ],
+    steps: {
+      ingredients: {
+        elementary:
+          'One uranium atom — the biggest atom that exists naturally. It is so heavy it can barely hold itself together.',
+        advanced:
+          'Reactant: ²³⁵U (uranium-235). The fissile nucleus is metastable; absorbing a slow (thermal) neutron pushes it past the binding-energy hump and it splits.',
+      },
+      combine: {
+        elementary:
+          'CRACK! The uranium splits into two smaller atoms. Three new neutrons fly out — and if they hit OTHER uranium atoms, the whole thing repeats. That is a chain reaction.',
+        advanced:
+          'A captured neutron deforms the U-236 intermediate beyond its critical Coulomb barrier. The nucleus splits into two roughly mid-mass fragments plus, on average, ~2.4 prompt neutrons — enough to sustain a chain reaction in a critical mass.',
+      },
+      results: {
+        elementary:
+          'Barium and krypton — two new atoms, made from one. Plus three neutrons, plus a HUGE amount of energy. This is what powers nuclear reactors, and what is inside a fission bomb.',
+        advanced:
+          '²³⁵U + ¹n → ¹⁴¹Ba + ⁹²Kr + 3 ¹n + ~200 MeV. About 0.1% of the input mass becomes energy. Every commercial fission reactor and every first-stage nuclear weapon runs on this reaction.',
       },
     },
   },

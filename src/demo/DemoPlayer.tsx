@@ -14,6 +14,7 @@ import { AnimatedMolecule } from './AnimatedMolecule'
 import { buildIngredientScene, buildProductLayout, getReactionMetadata } from './buildDemoScene'
 import { LightningEffect } from './LightningEffect'
 import { MoleculeLabel } from './MoleculeLabel'
+import { NuclearEffect } from './NuclearEffect'
 import { ReactionEffect } from './ReactionEffect'
 import { TransitionFlash } from './TransitionFlash'
 
@@ -65,6 +66,11 @@ const REACTION_TYPE_COLOR: Record<string, string> = {
   decomposition: '#c89eff',
   neutralization: '#a4ff8c',
   displacement: '#ffd97a',
+  // Nuclear types share the same hue family as the corresponding flash
+  // colors in TransitionFlash so the top-bar badge and the combine
+  // flash read as the same event.
+  fusion: '#5cc6ff',
+  fission: '#ff5a3a',
 }
 
 interface DemoPlayerProps {
@@ -242,11 +248,25 @@ export function DemoPlayer({ demo, initialLevel }: DemoPlayerProps) {
                   targetScale={unit.scale}
                 />
               ))}
-              <ReactionEffect
-                kind={demo.effectKind}
-                phaseStartedAt={transitionStartedAt}
-                durationMs={TRANSITION_MS}
-              />
+              {/* Chemistry effect vs nuclear effect — same role (driving
+                  particle vocabulary for the combine transition) but the
+                  motion language is different enough that nuclear demos
+                  get their own component. NuclearEffect implements the
+                  fusion-converge and fission-shatter recipes with neutron
+                  ejection; ReactionEffect handles the five chemistry kinds. */}
+              {demo.effectKind === 'fusion' || demo.effectKind === 'fission' ? (
+                <NuclearEffect
+                  kind={demo.effectKind}
+                  phaseStartedAt={transitionStartedAt}
+                  durationMs={TRANSITION_MS}
+                />
+              ) : (
+                <ReactionEffect
+                  kind={demo.effectKind}
+                  phaseStartedAt={transitionStartedAt}
+                  durationMs={TRANSITION_MS}
+                />
+              )}
               {/* Environmental driver overlay — lightning bolts for
                   electricity-driven reactions (e.g. water electrolysis).
                   Stacks on top of the regular reaction-type effect so

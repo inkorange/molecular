@@ -6,10 +6,16 @@ import { type Group, Vector3 } from 'three'
 import type { Demonstration } from '@/src/data/demonstrations'
 import { ElectronSprite } from '@/src/scene/ElectronSprite'
 
+// ReactionEffect only handles chemistry effect kinds. Nuclear kinds
+// (fusion / fission) get their own dramatic VFX path via NuclearEffect,
+// so excluding them here keeps the recipe table small and forces
+// DemoPlayer to route nuclear demos correctly.
+type ChemEffectKind = Exclude<Demonstration['effectKind'], 'fusion' | 'fission'>
+
 interface ReactionEffectProps {
   /** Tags the visual vocabulary — synthesis/combustion/decomposition/
    *  neutralization/displacement. */
-  kind: Demonstration['effectKind']
+  kind: ChemEffectKind
   /** When did the current transition phase begin (performance.now). */
   phaseStartedAt: number
   /** Total transition duration in ms. The effect peaks around t≈0.6 and
@@ -20,7 +26,7 @@ interface ReactionEffectProps {
 // Per-kind tuning. Particle count, base color, motion vocabulary, and the
 // peak time within the transition window where the burst is loudest.
 const RECIPES: Record<
-  Demonstration['effectKind'],
+  ChemEffectKind,
   {
     /** How many particles to spawn. Capped for perf. */
     count: number

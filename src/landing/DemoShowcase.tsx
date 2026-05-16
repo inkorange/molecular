@@ -17,6 +17,8 @@ const REACTION_TYPE_LABEL: Record<string, string> = {
   decomposition: 'Decomposition',
   neutralization: 'Neutralization',
   displacement: 'Displacement',
+  fusion: 'Fusion',
+  fission: 'Fission',
 }
 
 const REACTION_TYPE_COLOR: Record<string, string> = {
@@ -25,6 +27,8 @@ const REACTION_TYPE_COLOR: Record<string, string> = {
   decomposition: '#c89eff',
   neutralization: '#a4ff8c',
   displacement: '#ffd97a',
+  fusion: '#5cc6ff',
+  fission: '#ff5a3a',
 }
 
 const CTA_STYLES =
