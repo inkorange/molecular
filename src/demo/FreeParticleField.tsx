@@ -15,26 +15,31 @@ interface FreeParticleFieldProps {
   hoverAmplitude?: number
 }
 
-// Per-particle visual recipe. Tunes color, glow, label glyph, and the
-// sprite size — keep the values in one place so adding a new kind
+// Per-particle visual recipe. Tunes color, glow, label, and sprite
+// sizes — keep the values in one place so adding a new kind
 // (electron / positron / antineutrino…) is a single-line addition.
 const RECIPE: Record<
   FreeParticleKind,
   {
     color: string
     label: string
+    /** Font size for the label. Word labels need smaller text than
+     *  single-glyph labels (γ) to keep the badge proportional. */
+    labelSize: number
     sphereRadius: number
     haloRadius: number
     haloOpacity: number
   }
 > = {
-  // Neutron — uncharged subatomic. Soft pale-gray sphere with a brighter
-  // halo so it reads as a particle rather than a bond stub.
+  // Neutron — uncharged subatomic. Small pale-gray sphere with a soft
+  // halo. Sized small enough that 3 of them (fission) don't crowd the
+  // products but bright enough to remain noticeable.
   neutron: {
     color: '#dffaff',
-    label: 'n',
-    sphereRadius: 0.22,
-    haloRadius: 0.38,
+    label: 'NEUTRON',
+    labelSize: 0.16,
+    sphereRadius: 0.13,
+    haloRadius: 0.22,
     haloOpacity: 0.4,
   },
   // Photon — quantum of electromagnetic energy. Brilliant yellow with a
@@ -42,6 +47,7 @@ const RECIPE: Record<
   photon: {
     color: '#fff5b8',
     label: 'γ',
+    labelSize: 0.3,
     sphereRadius: 0.16,
     haloRadius: 0.46,
     haloOpacity: 0.6,
@@ -144,11 +150,13 @@ export function FreeParticleField({
                 what this thing is called". */}
             <Billboard position={[0, recipe.haloRadius + 0.18, 0]}>
               <Text
-                fontSize={0.32}
+                fontSize={recipe.labelSize}
                 color={recipe.color}
                 anchorX="center"
                 anchorY="middle"
                 fontWeight="bold"
+                outlineWidth={0.008}
+                outlineColor="#0d0a22"
                 material-toneMapped={false}
               >
                 {recipe.label}
