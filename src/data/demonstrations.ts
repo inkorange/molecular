@@ -18,6 +18,30 @@ export type DemoIngredient =
   | { kind: 'library'; libraryId: string; count: number }
   | { kind: 'atom'; Z: number; count: number }
 
+/**
+ * Subatomic / massless particles released by the reaction that aren't
+ * full atoms but still belong in the Results scene — neutrons from
+ * nuclear events, gamma photons / heat photons from anything exothermic.
+ *
+ * Rendered as labeled glowing sprites alongside the product atoms so the
+ * conservation story stays visible: the user can SEE what came out of
+ * the reaction beyond the headline products.
+ */
+export type FreeParticleKind = 'neutron' | 'photon'
+export interface FreeParticle {
+  kind: FreeParticleKind
+  count: number
+}
+
+/**
+ * Relative magnitude of the energy released. 0 means the reaction is
+ * endothermic or near-thermoneutral and no glow is rendered; 1–5 ramp
+ * the brightness + quanta count of the energy halo. The numeric scale is
+ * deliberately log-ish (level 5 is nuclear, level 1 is mild heat) so the
+ * visualization can span chemistry and nuclear regimes without flattening.
+ */
+export type EnergyScale = 0 | 1 | 2 | 3 | 4 | 5
+
 export interface DemoStepText {
   elementary: string
   advanced: string
@@ -70,6 +94,24 @@ export interface Demonstration {
    * Useful for the "atoms" demos where products visually differ.
    */
   products?: DemoIngredient[]
+  /**
+   * Subatomic particles released alongside the products. Drawn as
+   * floating labeled sprites around the product cluster in the Results
+   * step so the user can SEE neutrons / photons that the reaction emitted.
+   */
+  freeParticles?: FreeParticle[]
+  /**
+   * Magnitude of energy released, on a relative 0–5 scale. Drives the
+   * brightness + quanta count of the energy halo in the Results step.
+   * Omit (or set to 0) for endothermic / near-thermoneutral reactions.
+   */
+  energyScale?: EnergyScale
+  /**
+   * Optional human-readable energy magnitude shown as floating 3D text
+   * in the Results step (e.g. "17.6 MeV", "−572 kJ/mol", "+57 kJ/mol").
+   * Pair with `energyScale` to drive both the label and the visual.
+   */
+  energyLabel?: string
   /** Step text, per audience level. */
   steps: {
     ingredients: DemoStepText
@@ -91,6 +133,9 @@ export const DEMOS: Demonstration[] = [
       { kind: 'library', libraryId: 'hydrogen-gas', count: 2 },
       { kind: 'library', libraryId: 'oxygen-gas', count: 1 },
     ],
+    freeParticles: [{ kind: 'photon', count: 4 }],
+    energyScale: 4,
+    energyLabel: '−572 kJ/mol',
     steps: {
       ingredients: {
         elementary:
@@ -124,6 +169,9 @@ export const DEMOS: Demonstration[] = [
       { kind: 'library', libraryId: 'hydrogen-gas', count: 3 },
       { kind: 'library', libraryId: 'nitrogen-gas', count: 1 },
     ],
+    freeParticles: [{ kind: 'photon', count: 2 }],
+    energyScale: 2,
+    energyLabel: '−92 kJ/mol',
     steps: {
       ingredients: {
         elementary:
@@ -161,6 +209,9 @@ export const DEMOS: Demonstration[] = [
       { kind: 'atom', Z: 17, count: 2 },
     ],
     products: [{ kind: 'library', libraryId: 'sodium-chloride', count: 2 }],
+    freeParticles: [{ kind: 'photon', count: 3 }],
+    energyScale: 4,
+    energyLabel: '−411 kJ/mol per NaCl',
     steps: {
       ingredients: {
         elementary:
@@ -194,6 +245,9 @@ export const DEMOS: Demonstration[] = [
       { kind: 'library', libraryId: 'methane', count: 1 },
       { kind: 'library', libraryId: 'oxygen-gas', count: 2 },
     ],
+    freeParticles: [{ kind: 'photon', count: 5 }],
+    energyScale: 4,
+    energyLabel: '−891 kJ/mol',
     steps: {
       ingredients: {
         elementary:
@@ -258,6 +312,9 @@ export const DEMOS: Demonstration[] = [
       { kind: 'library', libraryId: 'hydrochloric-acid', count: 1 },
       { kind: 'library', libraryId: 'sodium-hydroxide', count: 1 },
     ],
+    freeParticles: [{ kind: 'photon', count: 1 }],
+    energyScale: 1,
+    energyLabel: '−57 kJ/mol',
     steps: {
       ingredients: {
         elementary:
@@ -303,6 +360,9 @@ export const DEMOS: Demonstration[] = [
       { kind: 'atom', Z: 30, count: 1 },
       { kind: 'atom', Z: 17, count: 2 },
     ],
+    freeParticles: [{ kind: 'photon', count: 2 }],
+    energyScale: 2,
+    energyLabel: '−154 kJ/mol',
     steps: {
       ingredients: {
         elementary:
@@ -333,6 +393,9 @@ export const DEMOS: Demonstration[] = [
     difficulty: 1,
     effectKind: 'synthesis',
     ingredients: [{ kind: 'atom', Z: 1, count: 2 }],
+    freeParticles: [{ kind: 'photon', count: 3 }],
+    energyScale: 3,
+    energyLabel: '−436 kJ/mol',
     steps: {
       ingredients: {
         elementary:
@@ -366,6 +429,9 @@ export const DEMOS: Demonstration[] = [
       { kind: 'atom', Z: 6, count: 1 },
       { kind: 'library', libraryId: 'oxygen-gas', count: 1 },
     ],
+    freeParticles: [{ kind: 'photon', count: 3 }],
+    energyScale: 3,
+    energyLabel: '−394 kJ/mol',
     steps: {
       ingredients: {
         elementary:
@@ -406,6 +472,9 @@ export const DEMOS: Demonstration[] = [
       { kind: 'atom', Z: 12, count: 2 },
       { kind: 'atom', Z: 8, count: 2 },
     ],
+    freeParticles: [{ kind: 'photon', count: 5 }],
+    energyScale: 4,
+    energyLabel: '−602 kJ/mol per MgO',
     steps: {
       ingredients: {
         elementary:
@@ -439,6 +508,9 @@ export const DEMOS: Demonstration[] = [
       { kind: 'library', libraryId: 'ethanol', count: 1 },
       { kind: 'library', libraryId: 'oxygen-gas', count: 3 },
     ],
+    freeParticles: [{ kind: 'photon', count: 5 }],
+    energyScale: 5,
+    energyLabel: '−1367 kJ/mol',
     steps: {
       ingredients: {
         elementary:
@@ -480,6 +552,9 @@ export const DEMOS: Demonstration[] = [
       { kind: 'atom', Z: 12, count: 1 },
       { kind: 'atom', Z: 17, count: 2 },
     ],
+    freeParticles: [{ kind: 'photon', count: 3 }],
+    energyScale: 3,
+    energyLabel: '−466 kJ/mol',
     steps: {
       ingredients: {
         elementary:
@@ -543,6 +618,9 @@ export const DEMOS: Demonstration[] = [
       { kind: 'library', libraryId: 'propane', count: 1 },
       { kind: 'library', libraryId: 'oxygen-gas', count: 5 },
     ],
+    freeParticles: [{ kind: 'photon', count: 6 }],
+    energyScale: 5,
+    energyLabel: '−2220 kJ/mol',
     steps: {
       ingredients: {
         elementary:
@@ -585,6 +663,15 @@ export const DEMOS: Demonstration[] = [
     effectKind: 'fusion',
     ingredients: [{ kind: 'atom', Z: 1, count: 2 }],
     products: [{ kind: 'atom', Z: 2, count: 1 }],
+    // The free neutron and burst of gamma radiation are what carry the
+    // 17.6 MeV of released energy. Showing them in the Results scene
+    // closes the "where did the mass go?" loop for students.
+    freeParticles: [
+      { kind: 'neutron', count: 1 },
+      { kind: 'photon', count: 3 },
+    ],
+    energyScale: 5,
+    energyLabel: '17.6 MeV',
     steps: {
       ingredients: {
         elementary:
@@ -624,6 +711,15 @@ export const DEMOS: Demonstration[] = [
       { kind: 'atom', Z: 56, count: 1 },
       { kind: 'atom', Z: 36, count: 1 },
     ],
+    // Three free neutrons + a gamma burst. The neutrons are what makes
+    // a chain reaction possible — each one can trigger another fission
+    // event in nearby U-235 nuclei.
+    freeParticles: [
+      { kind: 'neutron', count: 3 },
+      { kind: 'photon', count: 4 },
+    ],
+    energyScale: 5,
+    energyLabel: '~200 MeV',
     steps: {
       ingredients: {
         elementary:

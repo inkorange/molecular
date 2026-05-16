@@ -12,6 +12,8 @@ import { Molecule } from '@/src/scene/Molecule'
 import { Scene } from '@/src/scene/Scene'
 import { AnimatedMolecule } from './AnimatedMolecule'
 import { buildIngredientScene, buildProductLayout, getReactionMetadata } from './buildDemoScene'
+import { EnergyDisplay } from './EnergyDisplay'
+import { FreeParticleField } from './FreeParticleField'
 import { LightningEffect } from './LightningEffect'
 import { MoleculeLabel } from './MoleculeLabel'
 import { NuclearEffect } from './NuclearEffect'
@@ -307,6 +309,20 @@ export function DemoPlayer({ demo, initialLevel }: DemoPlayerProps) {
                     {unit.libraryId && <MoleculeLabel libraryId={unit.libraryId} />}
                   </group>
                 ))}
+                {/* Free particles released by the reaction (neutrons,
+                    photons) — rendered alongside the products so the
+                    conservation of matter/energy is visible. Skipped
+                    when the demo declared none. */}
+                {demo.freeParticles && demo.freeParticles.length > 0 && (
+                  <FreeParticleField particles={demo.freeParticles} />
+                )}
+                {/* Energy-release gauge. Vertical thermometer-style bar
+                    on the right of the scene + a swarm of ambient
+                    quanta. Hidden for endothermic / neutral reactions
+                    (energyScale=0 or undefined). */}
+                {demo.energyScale !== undefined && demo.energyScale > 0 && (
+                  <EnergyDisplay scale={demo.energyScale} label={demo.energyLabel} />
+                )}
               </group>
             </>
           )}
