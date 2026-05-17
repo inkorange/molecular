@@ -449,7 +449,11 @@ export function DemoPlayer({ demo, initialLevel }: DemoPlayerProps) {
                     quanta. Hidden for endothermic / neutral reactions
                     (energyScale=0 or undefined). */}
                 {demo.energyScale !== undefined && demo.energyScale > 0 && (
-                  <EnergyDisplay scale={demo.energyScale} label={demo.energyLabel} />
+                  <EnergyDisplay
+                    scale={demo.energyScale}
+                    direction={demo.energyDirection}
+                    label={demo.energyLabel}
+                  />
                 )}
               </group>
             </>
