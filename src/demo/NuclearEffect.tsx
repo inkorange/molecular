@@ -7,7 +7,7 @@ import { ElectronSprite } from '@/src/scene/ElectronSprite'
 
 interface NuclearEffectProps {
   /** Which kind of nuclear event to render. */
-  kind: 'fusion' | 'fission'
+  kind: 'fusion' | 'fission' | 'decay'
   /** When did the current transition phase begin (performance.now). */
   phaseStartedAt: number
   /** Total transition duration in ms. */
@@ -57,6 +57,24 @@ const FISSION = {
   neutronScale: 0.16,
 }
 
+// === Decay recipe ===
+// Spontaneous emission from a single unstable nucleus. Far gentler than
+// fission — a small cluster of particles drifts away from origin in
+// one direction (alpha emission) plus a thin halo of background
+// shimmer (the gamma "afterglow" you'd see in a cloud chamber). No
+// shrapnel, no neutron volley — just a quiet release.
+const DECAY = {
+  // Small puff of particles trailing behind the alpha particle as it
+  // leaves the nucleus.
+  trailCount: 28,
+  trailTravel: 5.5,
+  // Soft greenish "radioactive" palette — distinct from fusion's blue
+  // and fission's orange so each nuclear demo reads as its own event.
+  palette: ['#a4ff8c', '#dffaff', '#c8ff7a', '#fff5b8'],
+  peakAt: 0.55,
+  spriteScale: 0.16,
+}
+
 interface PlasmaParticle {
   start: Vector3
   color: string
@@ -66,6 +84,17 @@ interface PlasmaParticle {
 
 interface ShrapnelParticle {
   dir: Vector3
+  color: string
+  offset: number
+}
+
+interface DecayTrailParticle {
+  /** Direction from origin along the alpha ejection axis (with small
+   *  random sideways jitter). */
+  dir: Vector3
+  /** Per-particle starting distance along the ejection direction —
+   *  staggers the trail behind the leading alpha. */
+  startOffset: number
   color: string
   offset: number
 }
@@ -135,33 +164,64 @@ export function NuclearEffect({ kind, phaseStartedAt, durationMs }: NuclearEffec
       const neutrons: Neutron[] = [{ dir: new Vector3(dx, dy, dz) }]
       return { kind: 'fusion' as const, plasma, neutrons }
     }
-    // fission
-    const rand = rng(0xf155)
-    const shrapnel: ShrapnelParticle[] = []
-    for (let i = 0; i < FISSION.shrapnelCount; i++) {
-      const theta = rand() * Math.PI * 2
-      const phi = Math.acos(2 * rand() - 1)
-      const dx = Math.cos(theta) * Math.sin(phi)
-      const dy = Math.sin(theta) * Math.sin(phi)
-      const dz = Math.cos(phi)
-      shrapnel.push({
-        dir: new Vector3(dx, dy, dz),
-        color: FISSION.palette[i % FISSION.palette.length] ?? '#ff7a8c',
-        offset: rand() * 0.18,
+    if (kind === 'fission') {
+      const rand = rng(0xf155)
+      const shrapnel: ShrapnelParticle[] = []
+      for (let i = 0; i < FISSION.shrapnelCount; i++) {
+        const theta = rand() * Math.PI * 2
+        const phi = Math.acos(2 * rand() - 1)
+        const dx = Math.cos(theta) * Math.sin(phi)
+        const dy = Math.sin(theta) * Math.sin(phi)
+        const dz = Math.cos(phi)
+        shrapnel.push({
+          dir: new Vector3(dx, dy, dz),
+          color: FISSION.palette[i % FISSION.palette.length] ?? '#ff7a8c',
+          offset: rand() * 0.18,
+        })
+      }
+      // Three neutrons evenly spaced around the equator, with small
+      // randomised jitter so they don't read as a perfect tripod.
+      const neutrons: Neutron[] = []
+      for (let i = 0; i < FISSION.neutronCount; i++) {
+        const theta = (i / FISSION.neutronCount) * Math.PI * 2 + (rand() - 0.5) * 0.4
+        const phi = Math.PI / 2 + (rand() - 0.5) * 0.6
+        const dx = Math.cos(theta) * Math.sin(phi)
+        const dy = Math.sin(theta) * Math.sin(phi)
+        const dz = Math.cos(phi)
+        neutrons.push({ dir: new Vector3(dx, dy, dz) })
+      }
+      return { kind: 'fission' as const, shrapnel, neutrons }
+    }
+
+    // decay — pick a single ejection axis (slightly upward + outward to
+    // the right by default) and lay a small trail of particles along
+    // it. Reads as "one particle drifting away" rather than the
+    // omnidirectional blast of fission.
+    const rand = rng(0xdec)
+    // Random ejection axis biased toward the upper-right hemisphere so
+    // it reads cleanly against the camera framing.
+    const exitTheta = (rand() - 0.5) * 0.8 // ±0.4 rad around +x
+    const exitPhi = Math.PI / 2 + (rand() - 0.5) * 0.6 // around equator
+    const axis = new Vector3(
+      Math.cos(exitTheta) * Math.sin(exitPhi),
+      Math.cos(exitPhi) + 0.25, // bias slightly up
+      Math.sin(exitTheta) * Math.sin(exitPhi),
+    ).normalize()
+
+    const trail: DecayTrailParticle[] = []
+    for (let i = 0; i < DECAY.trailCount; i++) {
+      // Small random sideways jitter so the trail has perceptible width.
+      const jx = (rand() - 0.5) * 0.4
+      const jy = (rand() - 0.5) * 0.4
+      const jz = (rand() - 0.5) * 0.4
+      trail.push({
+        dir: new Vector3(axis.x + jx, axis.y + jy, axis.z + jz).normalize(),
+        startOffset: rand() * 0.25,
+        color: DECAY.palette[i % DECAY.palette.length] ?? '#a4ff8c',
+        offset: rand() * 0.2,
       })
     }
-    // Three neutrons evenly spaced around the equator, with small
-    // randomised jitter so they don't read as a perfect tripod.
-    const neutrons: Neutron[] = []
-    for (let i = 0; i < FISSION.neutronCount; i++) {
-      const theta = (i / FISSION.neutronCount) * Math.PI * 2 + (rand() - 0.5) * 0.4
-      const phi = Math.PI / 2 + (rand() - 0.5) * 0.6
-      const dx = Math.cos(theta) * Math.sin(phi)
-      const dy = Math.sin(theta) * Math.sin(phi)
-      const dz = Math.cos(phi)
-      neutrons.push({ dir: new Vector3(dx, dy, dz) })
-    }
-    return { kind: 'fission' as const, shrapnel, neutrons }
+    return { kind: 'decay' as const, trail }
   }, [kind])
 
   // Each frame we walk the group's children in JSX render order:
@@ -204,30 +264,52 @@ export function NuclearEffect({ kind, phaseStartedAt, durationMs }: NuclearEffec
       return
     }
 
-    // fission
-    let idx = 0
-    for (let i = 0; i < plan.shrapnel.length; i++) {
-      const child = children[idx++]
-      const s = plan.shrapnel[i]
-      if (!child || !s) continue
-      const tt = Math.max(0, Math.min(1, t + s.offset - 0.05))
-      const dist = FISSION.shrapnelTravel * tt
-      child.position.set(s.dir.x * dist, s.dir.y * dist, s.dir.z * dist)
-      const env =
-        tt < FISSION.peakAt ? tt / FISSION.peakAt : 1 - (tt - FISSION.peakAt) / (1 - FISSION.peakAt)
-      setOpacity(child, Math.max(0, env))
+    if (plan.kind === 'fission') {
+      let idx = 0
+      for (let i = 0; i < plan.shrapnel.length; i++) {
+        const child = children[idx++]
+        const s = plan.shrapnel[i]
+        if (!child || !s) continue
+        const tt = Math.max(0, Math.min(1, t + s.offset - 0.05))
+        const dist = FISSION.shrapnelTravel * tt
+        child.position.set(s.dir.x * dist, s.dir.y * dist, s.dir.z * dist)
+        const env =
+          tt < FISSION.peakAt
+            ? tt / FISSION.peakAt
+            : 1 - (tt - FISSION.peakAt) / (1 - FISSION.peakAt)
+        setOpacity(child, Math.max(0, env))
+      }
+      // Neutrons emerge slightly after the initial burst — sells the
+      // "chain-reaction trigger" payoff.
+      const NEUTRON_DELAY = 0.25
+      for (let i = 0; i < plan.neutrons.length; i++) {
+        const child = children[idx++]
+        const n = plan.neutrons[i]
+        if (!child || !n) continue
+        const tt = Math.max(0, t - NEUTRON_DELAY)
+        const dist = tt * FISSION.neutronTravel
+        child.position.set(n.dir.x * dist, n.dir.y * dist, n.dir.z * dist)
+        setOpacity(child, tt > 0 ? Math.max(0, 1 - tt * 0.55) : 0)
+      }
+      return
     }
-    // Neutrons emerge slightly after the initial burst — sells the
-    // "chain-reaction trigger" payoff.
-    const NEUTRON_DELAY = 0.25
-    for (let i = 0; i < plan.neutrons.length; i++) {
+
+    // decay — drift particles along the ejection axis with staggered
+    // starts. Trail thickens then thins as the alpha leaves the nucleus.
+    let idx = 0
+    for (let i = 0; i < plan.trail.length; i++) {
       const child = children[idx++]
-      const n = plan.neutrons[i]
-      if (!child || !n) continue
-      const tt = Math.max(0, t - NEUTRON_DELAY)
-      const dist = tt * FISSION.neutronTravel
-      child.position.set(n.dir.x * dist, n.dir.y * dist, n.dir.z * dist)
-      setOpacity(child, tt > 0 ? Math.max(0, 1 - tt * 0.55) : 0)
+      const p = plan.trail[i]
+      if (!child || !p) continue
+      // tt: 0..1 over the transition, offset so individual particles
+      // emerge in waves rather than all at once.
+      const tt = Math.max(0, Math.min(1, t + p.offset - 0.05))
+      const dist = (p.startOffset + tt) * DECAY.trailTravel
+      child.position.set(p.dir.x * dist, p.dir.y * dist, p.dir.z * dist)
+      // Triangle envelope around peak — softer than fission's burst.
+      const env =
+        tt < DECAY.peakAt ? tt / DECAY.peakAt : 1 - (tt - DECAY.peakAt) / (1 - DECAY.peakAt)
+      setOpacity(child, Math.max(0, env * 0.85))
     }
   })
 
@@ -274,6 +356,17 @@ export function NuclearEffect({ kind, phaseStartedAt, durationMs }: NuclearEffec
             position={[0, 0, 0]}
             scale={FISSION.neutronScale}
             color="#a4ff8c"
+            opacity={0}
+          />
+        ))}
+      {plan.kind === 'decay' &&
+        plan.trail.map((p, i) => (
+          <ElectronSprite
+            // biome-ignore lint/suspicious/noArrayIndexKey: stable layout per kind
+            key={`dec-t-${i}`}
+            position={[0, 0, 0]}
+            scale={DECAY.spriteScale}
+            color={p.color}
             opacity={0}
           />
         ))}

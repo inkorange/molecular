@@ -19,6 +19,7 @@ const REACTION_TYPE_LABEL: Record<string, string> = {
   displacement: 'Displacement',
   fusion: 'Fusion',
   fission: 'Fission',
+  decay: 'Decay',
 }
 
 const REACTION_TYPE_COLOR: Record<string, string> = {
@@ -29,6 +30,7 @@ const REACTION_TYPE_COLOR: Record<string, string> = {
   displacement: '#ffd97a',
   fusion: '#5cc6ff',
   fission: '#ff5a3a',
+  decay: '#a4ff8c',
 }
 
 const CTA_STYLES =

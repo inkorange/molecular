@@ -33,6 +33,10 @@ const FLASH_COLOR: Record<Demonstration['effectKind'], string> = {
   displacement: '#ffd97a',
   fusion: '#dffaff',
   fission: '#ff7a3a',
+  // Decay flash — soft radioactive-green so it reads distinct from
+  // the brighter fusion/fission events, matching the gentler nature
+  // of spontaneous alpha emission.
+  decay: '#a4ff8c',
 }
 
 // Where in (0..1) the flash peaks. Slightly before the visual midpoint so

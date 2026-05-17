@@ -3,7 +3,7 @@
 import { Billboard, Text } from '@react-three/drei'
 import { useFrame } from '@react-three/fiber'
 import { useMemo, useRef } from 'react'
-import { AdditiveBlending, CanvasTexture, type Sprite, SpriteMaterial } from 'three'
+import { AdditiveBlending, CanvasTexture, NormalBlending, type Sprite, SpriteMaterial } from 'three'
 import type { EnergyScale } from '@/src/data/demonstrations'
 
 interface EnergyDisplayProps {
@@ -13,10 +13,15 @@ interface EnergyDisplayProps {
   label?: string
 }
 
-// Where the cloud sits in scene coordinates. Above the product cluster
-// so it reads as energy radiating UP from the reaction site without
-// occluding the headline products.
-const CLOUD_POSITION: [number, number, number] = [0, 2.4, 0]
+// Where the cloud sits in scene coordinates. Just above + behind the
+// product cluster. The negative z pushes it back along the camera
+// look-axis so it can't overlap product molecules from the default
+// front view — propane combustion has a wide product layout that the
+// cloud would otherwise sit on top of when both share z=0. Auto-rotate
+// will eventually swing the cloud around in front of the products, but
+// that movement is gradual and reads as the cloud "circling" rather
+// than punching through them.
+const CLOUD_POSITION: [number, number, number] = [0, 1.5, -2.5]
 
 // Cloud size scales with energy magnitude. Sprite scale here is the
 // approximate world-unit diameter of the visible blob — the soft alpha
@@ -94,6 +99,44 @@ export function EnergyDisplay({ scale, label }: EnergyDisplayProps) {
     })
   }, [])
 
+  // Soft dark "shadow" sprite that sits in front of the cloud and
+  // behind the text. Procedural radial gradient — dark in the middle,
+  // fading to transparent at the edges so the cloud's color seeps
+  // back in around the text and the dimming doesn't read as a hard
+  // dark plate. Normal alpha blending: this sprite SUBTRACTS brightness
+  // (alpha-mixes a dark color over the bright additive cloud below).
+  const shadowMaterial = useMemo(() => {
+    const texSize = 128
+    const canvas = document.createElement('canvas')
+    canvas.width = texSize
+    canvas.height = texSize
+    const ctx = canvas.getContext('2d')
+    if (ctx) {
+      const grad = ctx.createRadialGradient(
+        texSize / 2,
+        texSize / 2,
+        0,
+        texSize / 2,
+        texSize / 2,
+        texSize / 2,
+      )
+      grad.addColorStop(0.0, 'rgba(15, 5, 8, 0.78)')
+      grad.addColorStop(0.4, 'rgba(15, 5, 8, 0.55)')
+      grad.addColorStop(0.75, 'rgba(15, 5, 8, 0.15)')
+      grad.addColorStop(1.0, 'rgba(15, 5, 8, 0)')
+      ctx.fillStyle = grad
+      ctx.fillRect(0, 0, texSize, texSize)
+    }
+    const texture = new CanvasTexture(canvas)
+    return new SpriteMaterial({
+      map: texture,
+      transparent: true,
+      blending: NormalBlending,
+      depthWrite: false,
+      toneMapped: false,
+    })
+  }, [])
+
   const spriteRef = useRef<Sprite>(null)
   const baseSizeRef = useRef(size)
 
@@ -122,21 +165,23 @@ export function EnergyDisplay({ scale, label }: EnergyDisplayProps) {
     <group position={CLOUD_POSITION}>
       <sprite ref={spriteRef} material={spriteMaterial} scale={size} />
 
-      {/* Energy magnitude — billboarded 3D text embedded inside the blob.
-          Dark fill on a bright outline gives it the strongest possible
-          contrast against the luminous additive cloud behind it. White
-          fill (the previous choice) lost in the white-hot core. */}
+      {/* Energy magnitude — billboarded 3D text embedded inside the
+          blob. The label sits on top of a soft dark "shadow" sprite
+          which DIMS the bright additive cloud behind it — without that
+          dimming, bloom bleed from the cloud washes out the dark text
+          and the label becomes invisible. The shadow sprite uses
+          normal alpha blending (NOT additive) so it actually subtracts
+          brightness rather than adding to it. */}
       {label && (
         <Billboard>
+          <sprite material={shadowMaterial} scale={size * 0.45} />
           <Text
-            fontSize={Math.min(0.32, 0.18 + clamped * 0.035)}
-            color="#1a0d2a"
+            position={[0, 0, 0.01]}
+            fontSize={Math.min(0.36, 0.2 + clamped * 0.04)}
+            color="#2a0808"
             anchorX="center"
             anchorY="middle"
             fontWeight="bold"
-            outlineWidth={0.02}
-            outlineColor="#fff5b8"
-            material-toneMapped={false}
           >
             {label}
           </Text>

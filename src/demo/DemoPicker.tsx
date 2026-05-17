@@ -2,8 +2,9 @@
 
 import { ArrowLeft, ArrowUpRight } from 'lucide-react'
 import Link from 'next/link'
-import { useState } from 'react'
-import { DEMOS } from '@/src/data/demonstrations'
+import { useMemo, useState } from 'react'
+import type { ReactionType } from '@/src/chem/reactions'
+import { DEMOS, type Demonstration } from '@/src/data/demonstrations'
 
 type Level = 'elementary' | 'advanced'
 
@@ -15,6 +16,7 @@ const REACTION_TYPE_LABEL: Record<string, string> = {
   displacement: 'Displacement',
   fusion: 'Fusion',
   fission: 'Fission',
+  decay: 'Decay',
 }
 
 const REACTION_TYPE_COLOR: Record<string, string> = {
@@ -24,10 +26,50 @@ const REACTION_TYPE_COLOR: Record<string, string> = {
   neutralization: '#a4ff8c',
   displacement: '#ffd97a',
   // Nuclear types share their hue family with TransitionFlash for visual
-  // continuity: fusion = hot blue plasma, fission = orange detonation.
+  // continuity: fusion = hot blue plasma, fission = orange detonation,
+  // decay = soft radioactive green.
   fusion: '#5cc6ff',
   fission: '#ff5a3a',
+  decay: '#a4ff8c',
 }
+
+// Picker categories. The grouping is computed from reactionType rather
+// than stored on each demo — keeps the demo data file flat and lets
+// the picker layout evolve without touching demo entries. Each
+// category has a display title and an ordered list of reactionTypes
+// that fall under it; iteration order here is the section order in
+// the picker.
+const CATEGORIES: ReadonlyArray<{
+  title: string
+  description: string
+  reactionTypes: readonly ReactionType[]
+}> = [
+  {
+    title: 'Building New Compounds',
+    description: 'Atoms come together and form something new.',
+    reactionTypes: ['synthesis'],
+  },
+  {
+    title: 'Combustion',
+    description: 'Fuel meets oxygen — flame, heat, and CO₂ + water.',
+    reactionTypes: ['combustion'],
+  },
+  {
+    title: 'Acids, Bases & Displacement',
+    description: 'Ions swap partners, salts form, hydrogen bubbles off.',
+    reactionTypes: ['neutralization', 'displacement'],
+  },
+  {
+    title: 'Breaking Apart',
+    description: 'Molecules pulled apart by energy — heat or electricity.',
+    reactionTypes: ['decomposition'],
+  },
+  {
+    title: 'Nuclear Reactions',
+    description: 'The nucleus itself changes — fusion, fission, and decay.',
+    reactionTypes: ['fusion', 'fission', 'decay'],
+  },
+]
 
 /**
  * Demo picker. Shows a grid of curated demonstration cards. The audience
@@ -38,8 +80,20 @@ const REACTION_TYPE_COLOR: Record<string, string> = {
 export function DemoPicker() {
   const [level, setLevel] = useState<Level>('elementary')
 
-  // Stable difficulty sort so basic demos appear first by default.
-  const sorted = [...DEMOS].sort((a, b) => a.difficulty - b.difficulty)
+  // Group demos by category. Within each category, demos are sorted by
+  // difficulty so the easier ones in a section come first. We compute
+  // this once on mount — DEMOS is a static module-level constant so
+  // grouping never needs to re-run unless the user navigates away and
+  // back.
+  const groups = useMemo(() => {
+    return CATEGORIES.map((cat) => {
+      const set = new Set<ReactionType>(cat.reactionTypes)
+      const demos = DEMOS.filter((d) => set.has(d.reactionType)).sort(
+        (a, b) => a.difficulty - b.difficulty,
+      )
+      return { ...cat, demos }
+    }).filter((g) => g.demos.length > 0)
+  }, [])
 
   return (
     <div className="mx-auto max-w-5xl px-6 pt-6 pb-12 md:px-12 md:pt-12 md:pb-20">
@@ -101,34 +155,53 @@ export function DemoPicker() {
         ))}
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {sorted.map((d) => (
-          <Link
-            key={d.id}
-            href={`/demo/${d.id}?level=${level}`}
-            className="group flex flex-col gap-3 rounded-xl border border-[#2a2655] bg-[#0d0a22]/60 p-5 transition-colors hover:border-[#5cc6ff]/40"
-          >
-            <div className="flex items-center justify-between gap-2">
-              <span
-                className="rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider"
-                style={{
-                  color: REACTION_TYPE_COLOR[d.reactionType],
-                  border: `1px solid ${REACTION_TYPE_COLOR[d.reactionType]}50`,
-                }}
-              >
-                {REACTION_TYPE_LABEL[d.reactionType]}
-              </span>
-              <span className="text-[10px] text-[#6a6f95]">Level {'•'.repeat(d.difficulty)}</span>
-            </div>
-            <h2 className="font-bold text-[#dffaff] text-xl">{d.title}</h2>
-            <p className="flex-1 text-[#9aa0c8] text-sm leading-snug">{d.summary}</p>
-            <span className="mt-1 inline-flex items-center gap-1 self-start font-bold text-[#5cc6ff] text-xs uppercase tracking-wider group-hover:underline">
-              Play demo
-              <ArrowUpRight className="h-4 w-4" strokeWidth={2.5} />
-            </span>
-          </Link>
-        ))}
-      </div>
+      {groups.map((group) => (
+        <section key={group.title} className="mb-12 last:mb-0">
+          <header className="mb-4">
+            <h2 className="font-extrabold text-[#dffaff] text-lg uppercase tracking-wider md:text-xl">
+              {group.title}
+            </h2>
+            <p className="mt-1 text-[#6a6f95] text-sm">{group.description}</p>
+          </header>
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {group.demos.map((d) => (
+              <DemoCard key={d.id} demo={d} level={level} />
+            ))}
+          </div>
+        </section>
+      ))}
     </div>
+  )
+}
+
+/**
+ * Single demo card. Pulled out as a component because the picker now
+ * renders multiple groups and JSX repetition was getting noisy.
+ */
+function DemoCard({ demo, level }: { demo: Demonstration; level: Level }) {
+  return (
+    <Link
+      href={`/demo/${demo.id}?level=${level}`}
+      className="group flex flex-col gap-3 rounded-xl border border-[#2a2655] bg-[#0d0a22]/60 p-5 transition-colors hover:border-[#5cc6ff]/40"
+    >
+      <div className="flex items-center justify-between gap-2">
+        <span
+          className="rounded-full px-2 py-0.5 font-bold text-[10px] uppercase tracking-wider"
+          style={{
+            color: REACTION_TYPE_COLOR[demo.reactionType],
+            border: `1px solid ${REACTION_TYPE_COLOR[demo.reactionType]}50`,
+          }}
+        >
+          {REACTION_TYPE_LABEL[demo.reactionType]}
+        </span>
+        <span className="text-[10px] text-[#6a6f95]">Level {'•'.repeat(demo.difficulty)}</span>
+      </div>
+      <h3 className="font-bold text-[#dffaff] text-xl">{demo.title}</h3>
+      <p className="flex-1 text-[#9aa0c8] text-sm leading-snug">{demo.summary}</p>
+      <span className="mt-1 inline-flex items-center gap-1 self-start font-bold text-[#5cc6ff] text-xs uppercase tracking-wider group-hover:underline">
+        Play demo
+        <ArrowUpRight className="h-4 w-4" strokeWidth={2.5} />
+      </span>
+    </Link>
   )
 }

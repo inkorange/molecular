@@ -5,12 +5,13 @@ export type ReactionType =
   | 'combustion'
   | 'neutralization'
   // Nuclear reactions — distinct from the chemistry types above. Used only
-  // by the demonstration player for fusion / fission visuals; the chemistry
-  // engine doesn't simulate either, so no matching entries appear in the
-  // REACTIONS table below. Listed here so the type is the single source of
-  // truth for what a demo's `reactionType` can be.
+  // by the demonstration player for fusion / fission / decay visuals; the
+  // chemistry engine doesn't simulate any of them, so no matching entries
+  // appear in the REACTIONS table below. Listed here so the type is the
+  // single source of truth for what a demo's `reactionType` can be.
   | 'fusion'
   | 'fission'
+  | 'decay'
 
 export interface Stoich {
   formula: string

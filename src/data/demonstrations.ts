@@ -74,9 +74,11 @@ export interface Demonstration {
     // Nuclear effect kinds. Drive a distinct VFX path in DemoPlayer
     // (NuclearEffect) instead of the chemistry-style ReactionEffect —
     // fusion converges + flashes inward, fission shatters outward with
-    // ejected neutrons. Visually dramatic to match the energy scale.
+    // ejected neutrons, decay spontaneously emits a single alpha
+    // particle. Visually dramatic to match the energy scale.
     | 'fusion'
     | 'fission'
+    | 'decay'
   /**
    * Optional environmental trigger overlay. When present, the player
    * layers an additional visual on top of the reaction-type effect:
@@ -722,6 +724,204 @@ export const DEMOS: Demonstration[] = [
           'Barium and krypton — two new atoms, made from one. Plus three neutrons, plus a HUGE amount of energy. This is what powers nuclear reactors, and what is inside a fission bomb.',
         advanced:
           '²³⁵U + ¹n → ¹⁴¹Ba + ⁹²Kr + 3 ¹n + ~200 MeV. About 0.1% of the input mass becomes energy. Every commercial fission reactor and every first-stage nuclear weapon runs on this reaction.',
+      },
+    },
+  },
+  {
+    id: 'thermite',
+    title: 'Thermite reaction',
+    summary: 'Aluminum rips oxygen away from rust — molten iron pours out.',
+    reactionId: 'thermite',
+    reactionType: 'displacement',
+    difficulty: 4,
+    // Visually a combustion-style burst — molten metal, blinding flash —
+    // even though it's chemically a single-displacement reaction.
+    effectKind: 'combustion',
+    // Render reactants as bare atoms. Iron oxide (Fe₂O₃) and aluminum
+    // aren't in the molecule library; bare atoms convey the
+    // stoichiometry without needing custom library entries.
+    ingredients: [
+      { kind: 'atom', Z: 26, count: 2 },
+      { kind: 'atom', Z: 8, count: 3 },
+      { kind: 'atom', Z: 13, count: 2 },
+    ],
+    // Products: Al₂O₃ (alumina) + molten Fe. Both as bare atoms for
+    // the same reason as ingredients.
+    products: [
+      { kind: 'atom', Z: 13, count: 2 },
+      { kind: 'atom', Z: 8, count: 3 },
+      { kind: 'atom', Z: 26, count: 2 },
+    ],
+    energyScale: 5,
+    energyLabel: '~−850 kJ/mol',
+    steps: {
+      ingredients: {
+        elementary:
+          'Two pieces of rust (iron + oxygen) and two pieces of aluminum. Aluminum REALLY wants to grab oxygen — more than iron does.',
+        advanced:
+          'Reactants: Fe₂O₃ (s) and 2 Al (s). Aluminum sits well above iron on the reactivity series, so Al can reduce Fe³⁺ all the way back to elemental Fe.',
+      },
+      combine: {
+        elementary:
+          'BLINDING WHITE FLASH! The aluminum yanks the oxygen off the iron. Iron is left so hot it melts and pours like lava.',
+        advanced:
+          "Each Al → Al³⁺ + 3 e⁻ (oxidation); each Fe³⁺ + 3 e⁻ → Fe (reduction). The reaction is so exothermic it heats the molten iron to ~2500 °C, well past iron's melting point.",
+      },
+      results: {
+        elementary:
+          'Aluminum oxide (white powder) and pure iron — so hot it flows like water. Workers use this to weld railway tracks together out in the field.',
+        advanced:
+          'Fe₂O₃ + 2 Al → Al₂O₃ + 2 Fe. ΔH ≈ −850 kJ/mol — among the most energetic non-nuclear reactions accessible without specialised equipment. Used industrially in field welding and incendiary munitions.',
+      },
+    },
+  },
+  {
+    id: 'alpha-decay',
+    title: 'Alpha decay',
+    summary: 'An unstable nucleus spits out a helium atom on its own.',
+    reactionId: 'u238-alpha-decay',
+    reactionType: 'decay',
+    difficulty: 5,
+    effectKind: 'decay',
+    // Uranium-238 — the most abundant uranium isotope, naturally
+    // radioactive, decays slowly (half-life 4.5 billion years).
+    ingredients: [{ kind: 'atom', Z: 92, count: 1 }],
+    // Thorium-234 + the alpha particle (a helium-4 nucleus). We
+    // render the alpha as a regular helium atom so the user sees
+    // exactly what flew out.
+    products: [
+      { kind: 'atom', Z: 90, count: 1 },
+      { kind: 'atom', Z: 2, count: 1 },
+    ],
+    energyScale: 4,
+    energyLabel: '4.27 MeV',
+    steps: {
+      ingredients: {
+        elementary:
+          'A uranium atom — naturally unstable. Just sitting there, slowly trying to find a more stable shape.',
+        advanced:
+          'Reactant: ²³⁸U (uranium-238). The nucleus is past the line of nuclear stability; lowering its mass-energy by emitting a tightly-bound ⁴He cluster is the most favourable decay path.',
+      },
+      combine: {
+        elementary:
+          'Without anything triggering it, the uranium spits out a tiny chunk — a helium nucleus. Now the uranium has changed into a different element: thorium.',
+        advanced:
+          '²³⁸U → ²³⁴Th + ⁴He via tunnelling through the Coulomb barrier. Energetics are governed by binding-energy differences; no external particle is required.',
+      },
+      results: {
+        elementary:
+          'Thorium and a helium atom. The helium flew off so fast it can punch through skin (this is alpha radiation). Uranium does this trillions of times per second in any uranium sample.',
+        advanced:
+          '²³⁸U → ²³⁴Th + ⁴He + 4.27 MeV. Half-life: 4.468 × 10⁹ y. The energy is carried away mostly as alpha-particle kinetic energy. The basis of uranium-lead radiometric dating.',
+      },
+    },
+  },
+  {
+    id: 'pp-chain-fusion',
+    title: 'Solar fusion (proton-proton)',
+    summary: 'Four hydrogen atoms fuse into helium — this is how the Sun shines.',
+    reactionId: 'pp-chain',
+    reactionType: 'fusion',
+    difficulty: 5,
+    effectKind: 'fusion',
+    // 4 protons net — the visual abstracts the multi-step PP-I chain
+    // into a single 4→1 fusion event for clarity.
+    ingredients: [{ kind: 'atom', Z: 1, count: 4 }],
+    products: [{ kind: 'atom', Z: 2, count: 1 }],
+    energyScale: 5,
+    energyLabel: '26.7 MeV',
+    steps: {
+      ingredients: {
+        elementary:
+          'Four hydrogen atoms, deep in the heart of a star. The Sun has a LOT of these, being crushed by gravity at millions of degrees.',
+        advanced:
+          "Reactants (net): 4 ¹H. The actual PP-I chain runs in three stages over ~10⁹ years per cycle in the Sun's core, mediated by ²H and ³He intermediates and the weak interaction.",
+      },
+      combine: {
+        elementary:
+          'In a long chain of tiny collisions, four protons squeeze together until they merge into one helium atom. The mass that disappears becomes pure energy.',
+        advanced:
+          'Steps: 2(¹H + ¹H → ²H + e⁺ + νe), 2(²H + ¹H → ³He + γ), then ³He + ³He → ⁴He + 2¹H. Net: 4 ¹H → ⁴He + 2 e⁺ + 2 νe + ~26.7 MeV (incl. positron annihilation).',
+      },
+      results: {
+        elementary:
+          "One helium atom and a HUGE amount of energy. The Sun does this 10³⁸ times every second — that's where sunlight comes from.",
+        advanced:
+          'Net: 4 ¹H → ⁴He + 26.7 MeV. The mass deficit (~0.7%) is converted per E = mc². The PP chain powers all stars below ~1.3 M☉, including the Sun.',
+      },
+    },
+  },
+  {
+    id: 'triple-alpha',
+    title: 'Triple-alpha process',
+    summary: 'Three helium atoms forge a carbon atom — how stars make life.',
+    reactionId: 'triple-alpha',
+    reactionType: 'fusion',
+    difficulty: 5,
+    effectKind: 'fusion',
+    // Three ⁴He nuclei combine into one ¹²C nucleus. The reaction is
+    // why heavy elements (and ultimately we) exist.
+    ingredients: [{ kind: 'atom', Z: 2, count: 3 }],
+    products: [{ kind: 'atom', Z: 6, count: 1 }],
+    energyScale: 4,
+    energyLabel: '7.3 MeV',
+    steps: {
+      ingredients: {
+        elementary:
+          'Three helium atoms inside a dying star. The star is old, hot, and dense — perfect conditions for helium to fuse into something heavier.',
+        advanced:
+          'Reactants: 3 ⁴He. Requires ~100 million K and high density — conditions reached in red giant cores after hydrogen burning depletes the stellar core.',
+      },
+      combine: {
+        elementary:
+          'The three helium atoms crash together and merge into a single carbon atom. Every carbon atom in your body — and every star — was made this way.',
+        advanced:
+          'Two-step: ⁴He + ⁴He ⇌ ⁸Be (unstable, lifetime 10⁻¹⁶ s), then ⁸Be + ⁴He → ¹²C* → ¹²C + γ via the Hoyle state resonance. Fred Hoyle predicted this excited state to explain the abundance of carbon.',
+      },
+      results: {
+        elementary:
+          'Carbon! The element that makes DNA, plants, and you. Every carbon atom in the universe came from this exact reaction in a red giant star.',
+        advanced:
+          '3 ⁴He → ¹²C + 7.275 MeV. Together with subsequent alpha-capture (¹²C + ⁴He → ¹⁶O, ¹⁶O + ⁴He → ²⁰Ne, ...) this is how nucleosynthesis builds elements up to iron in stellar interiors.',
+      },
+    },
+  },
+  {
+    id: 'pu239-fission',
+    title: 'Plutonium-239 fission',
+    summary: 'A plutonium atom splits — the fuel of fast reactors and Fat Man.',
+    reactionId: 'pu239-fission',
+    reactionType: 'fission',
+    difficulty: 5,
+    effectKind: 'fission',
+    ingredients: [{ kind: 'atom', Z: 94, count: 1 }],
+    // Representative split — Pu-239 actually yields a distribution of
+    // fragments. Tellurium-134 + Molybdenum-102 is one common path.
+    products: [
+      { kind: 'atom', Z: 52, count: 1 },
+      { kind: 'atom', Z: 42, count: 1 },
+    ],
+    freeParticles: [{ kind: 'neutron', count: 3 }],
+    energyScale: 5,
+    energyLabel: '~210 MeV',
+    steps: {
+      ingredients: {
+        elementary:
+          'A plutonium atom — synthetic, even heavier than uranium, and even more eager to split apart.',
+        advanced:
+          'Reactant: ²³⁹Pu (plutonium-239). Bred from U-238 by neutron capture and two beta decays. Lower critical mass than U-235 (~10 kg vs ~52 kg), making it the fissile material of choice for compact warheads and breeder reactors.',
+      },
+      combine: {
+        elementary:
+          'A neutron hits the plutonium. It splits into two new atoms and shoots out THREE more neutrons — which can split THREE more plutoniums. Chain reaction!',
+        advanced:
+          '²³⁹Pu + n → ²⁴⁰Pu* → fission fragments + ~2.9 prompt neutrons + ~210 MeV. Higher neutron yield per fission than U-235 → easier to sustain a chain reaction.',
+      },
+      results: {
+        elementary:
+          "Tellurium and molybdenum — two new atoms made from plutonium splitting. Plus three free neutrons. Plus enormous energy. This is what's inside a fast-spectrum reactor or a plutonium bomb.",
+        advanced:
+          '²³⁹Pu + ¹n → ¹³⁴Te + ¹⁰²Mo + 3 ¹n + ~210 MeV (one of many possible splits). Used in fast breeder reactors, the Nagasaki "Fat Man" device, and the secondary stages of thermonuclear weapons.',
       },
     },
   },

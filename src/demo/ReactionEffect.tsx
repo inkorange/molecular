@@ -10,7 +10,7 @@ import { ElectronSprite } from '@/src/scene/ElectronSprite'
 // (fusion / fission) get their own dramatic VFX path via NuclearEffect,
 // so excluding them here keeps the recipe table small and forces
 // DemoPlayer to route nuclear demos correctly.
-type ChemEffectKind = Exclude<Demonstration['effectKind'], 'fusion' | 'fission'>
+type ChemEffectKind = Exclude<Demonstration['effectKind'], 'fusion' | 'fission' | 'decay'>
 
 interface ReactionEffectProps {
   /** Tags the visual vocabulary — synthesis/combustion/decomposition/

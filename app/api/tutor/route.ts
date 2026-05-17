@@ -10,13 +10,25 @@ export const runtime = 'nodejs'
 const PayloadSchema = z.object({
   sceneSummary: z.string().max(4000),
   tier: z.enum(['beginner', 'standard', 'advanced']),
-  mode: z.enum(['explore', 'build', 'lab']),
+  // 'demo' was added when the /demo player started sending its
+  // demonstration context (title + reactants + current step) through
+  // the same tutor endpoint. The model just sees the string; it's
+  // used to flavour the system prompt and as a label in the body.
+  mode: z.enum(['explore', 'build', 'lab', 'demo']),
   question: z.string().min(1).max(500),
 })
 
-function systemPrompt(tier: 'beginner' | 'standard' | 'advanced') {
+function systemPrompt(
+  tier: 'beginner' | 'standard' | 'advanced',
+  mode: 'explore' | 'build' | 'lab' | 'demo',
+) {
+  // Demo mode swaps "the current scene" for "this demonstration" so
+  // the model frames its answers around the specific demo the student
+  // is watching (ingredients → reaction → products) rather than an
+  // open sandbox.
+  const subject = mode === 'demo' ? 'this demonstration' : 'the current scene'
   const base = `You are a friendly, accurate chemistry tutor inside an educational 3D app called Molecular.
-You see the current scene as text and answer the student's question.
+You see ${subject} as text and answer the student's question.
 Keep responses concise (3-6 sentences). Use plain text, no Markdown.`
   if (tier === 'beginner') {
     return `${base}
@@ -63,7 +75,7 @@ export async function POST(req: Request) {
 
   const result = streamText({
     model,
-    system: systemPrompt(tier),
+    system: systemPrompt(tier, mode),
     prompt: `Mode: ${mode}\n\n${sceneSummary}\n\nStudent question: ${question}`,
   })
 
