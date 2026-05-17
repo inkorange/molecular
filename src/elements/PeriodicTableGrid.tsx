@@ -1,7 +1,10 @@
 'use client'
 
 import { PERIODIC_ELEMENTS } from '@/src/data/elementsFull'
+import { getElementTrends } from '@/src/data/elementTrends'
+import { categoryAccent } from './categoryColors'
 import { PeriodicTile } from './PeriodicTile'
+import { type ElementViewMode, tileAccentForView } from './trendOverlay'
 
 interface PeriodicTableGridProps {
   /** Slug of the currently-selected element, if any. The matching tile
@@ -13,6 +16,8 @@ interface PeriodicTableGridProps {
   registerRef?: (slug: string, el: HTMLButtonElement | null) => void
   /** Apply a dim/blur treatment to every tile during a transition. */
   dimmed?: boolean
+  /** Coloring mode — 'categories' (default) or one of the trend keys. */
+  view?: ElementViewMode
 }
 
 /**
@@ -28,6 +33,7 @@ export function PeriodicTableGrid({
   onSelect,
   registerRef,
   dimmed,
+  view = 'categories',
 }: PeriodicTableGridProps) {
   return (
     <div
@@ -41,20 +47,43 @@ export function PeriodicTableGrid({
         filter: dimmed ? 'blur(2px)' : undefined,
       }}
     >
-      {PERIODIC_ELEMENTS.map((el) => (
-        <PeriodicTile
-          key={el.slug}
-          element={{
-            ...el,
-            // Rows 8 + 9 in our data become CSS grid rows 9 + 10 because of
-            // the inserted 12px spacer row.
-            row: el.row >= 8 ? el.row + 1 : el.row,
-          }}
-          onSelect={onSelect}
-          registerRef={registerRef}
-          hidden={selectedSlug === el.slug}
-        />
-      ))}
+      {PERIODIC_ELEMENTS.map((el) => {
+        // In trend mode, override the accent with a heatmap color and
+        // surface the numeric value in the tile's corner so students
+        // can compare exact numbers, not just hues.
+        const categoryFallback = categoryAccent(el.category)
+        const accent =
+          view === 'categories' ? categoryFallback : tileAccentForView(el.Z, view, categoryFallback)
+        const trendNumeric = view === 'categories' ? null : (getElementTrends(el.Z)[view] ?? null)
+        return (
+          <PeriodicTile
+            key={el.slug}
+            element={{
+              ...el,
+              // Rows 8 + 9 in our data become CSS grid rows 9 + 10 because of
+              // the inserted 12px spacer row.
+              row: el.row >= 8 ? el.row + 1 : el.row,
+            }}
+            onSelect={onSelect}
+            registerRef={registerRef}
+            hidden={selectedSlug === el.slug}
+            accentOverride={view === 'categories' ? undefined : accent}
+            trendValue={trendNumeric != null ? formatTrendValue(view, trendNumeric) : undefined}
+          />
+        )
+      })}
     </div>
   )
+}
+
+/** Format a numeric trend value for display in a tile corner — short
+ *  enough that it doesn't overflow the small tile. */
+function formatTrendValue(view: ElementViewMode, value: number): string {
+  if (view === 'electronegativity') return value.toFixed(2)
+  if (view === 'meltingPoint')
+    return value < 1000 ? String(Math.round(value)) : `${(value / 1000).toFixed(1)}k`
+  if (view === 'ionizationEnergy')
+    return value < 1000 ? String(Math.round(value)) : `${(value / 1000).toFixed(1)}k`
+  if (view === 'atomicRadius') return String(Math.round(value))
+  return String(Math.round(value))
 }

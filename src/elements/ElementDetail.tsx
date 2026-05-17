@@ -108,16 +108,33 @@ export function ElementDetail({
   const accent = categoryAccent(element.category)
   const content = getElementContent(element.Z)
   const related = useMemo(() => relatedMolecules(element.Z), [element.Z])
-  const neutronCount = Math.max(0, Math.round(element.mass) - element.Z)
 
-  // Defer the 3D scene mount to AFTER hydration. Mounting the R3F
-  // Canvas during the SSR→client hydration window was crashing the
-  // tab on refresh (WebGL context creation racing with React 19's
-  // concurrent commit). Waiting one effect tick lets hydration settle
-  // first.
+  // Currently-displayed isotope. Defaults to the standard atomic mass
+  // (a natural-abundance weighted average) so the rendered atom matches
+  // the page's headline mass on first paint. Clicking an isotope chip
+  // swaps this — the 3D atom + stat chips update live.
+  const [displayMass, setDisplayMass] = useState(element.mass)
+  // Reset the isotope selection when the user navigates between
+  // elements (different element → keep the new element's natural mass).
+  useEffect(() => {
+    setDisplayMass(element.mass)
+  }, [element.mass])
+  const neutronCount = Math.max(0, Math.round(displayMass) - element.Z)
+
+  // Defer the 3D scene mount until well after hydration. Two reasons:
+  // 1. Mounting the R3F Canvas during the SSR→client hydration window
+  //    was crashing the tab on refresh (WebGL context creation racing
+  //    with React 19's concurrent commit).
+  // 2. Browsers cap simultaneous WebGL contexts (Chrome ~16, mobile
+  //    sometimes ~8). Navigating from the homepage (3 canvases) to
+  //    /elements/[slug] (1 new canvas) can momentarily exceed the cap
+  //    before React unmounts the homepage canvases. The 300ms delay
+  //    lets those previous canvases run through their `forceContextLoss`
+  //    cleanup before we ask for a new context.
   const [hasMounted, setHasMounted] = useState(false)
   useEffect(() => {
-    setHasMounted(true)
+    const t = window.setTimeout(() => setHasMounted(true), 300)
+    return () => window.clearTimeout(t)
   }, [])
   // Auto-zoom: pull the camera back enough that the outermost electron
   // shell (which scales with shell count — 7 shells for uranium) fits
@@ -187,7 +204,14 @@ export function ElementDetail({
             on `hasMounted` so the R3F Canvas only initializes AFTER the
             hydration commit; mounting it during hydration was racing
             with React 19's concurrent rendering and crashing the tab. */}
-        <div className="aspect-square w-full overflow-hidden rounded-2xl border border-[#2a2655] bg-[#0d0a22]/40">
+        {/* The wrapping `self-start` is what lets `sticky` actually
+            stick in a CSS-grid row — without it the cell stretches to
+            row height and there's nothing to stick relative to.
+            `md:top-6` parks the canvas just below the persistent
+            backdrop heading. Mobile keeps the normal in-flow scroll
+            so the canvas can be tapped without competing with the
+            page scroll. */}
+        <div className="aspect-square w-full overflow-hidden rounded-2xl border border-[#2a2655] bg-[#0d0a22]/40 md:sticky md:top-6 md:self-start">
           {hasMounted && (
             <Suspense fallback={null}>
               {/* enableBloom={false} — the postprocessing chain (bloom +
@@ -212,7 +236,7 @@ export function ElementDetail({
                     flat 2D ring on first paint — they roll diagonally
                     across the frame, hinting at the 3D structure. */}
                 <group rotation={[0, 0, Math.PI / 4]}>
-                  <ElementAtom Z={element.Z} mass={element.mass} shells={element.shells} />
+                  <ElementAtom Z={element.Z} mass={displayMass} shells={element.shells} />
                 </group>
               </Scene>
             </Suspense>
@@ -339,6 +363,31 @@ export function ElementDetail({
             </div>
           </TooltipProvider>
 
+          {/* Isotopes — chip selector. Tapping a chip swaps the 3D
+              atom's neutron count. The displayed isotope is highlighted;
+              the rest are dim. Renders the per-isotope note below the
+              chip row so the user gets context for what they just picked. */}
+          {content.isotopes && content.isotopes.length > 0 && (
+            <IsotopeSection
+              symbol={element.symbol}
+              dominantMass={element.mass}
+              displayMass={displayMass}
+              isotopes={content.isotopes}
+              onSelect={(m) => setDisplayMass(m)}
+              accent={accent}
+            />
+          )}
+
+          {/* Origin & Abundance — where the element comes from cosmically
+              and where you find it in everyday contexts. */}
+          {(content.origin || content.abundance) && (
+            <OriginAbundanceSection
+              origin={content.origin}
+              abundance={content.abundance}
+              accent={accent}
+            />
+          )}
+
           {(content.discoveredYear || content.discoveredBy) && (
             <section>
               <h2 className="mb-1 font-bold text-[10px] text-[#9aa0c8] uppercase tracking-[0.25em]">
@@ -430,5 +479,157 @@ export function ElementDetail({
         </p>
       )}
     </div>
+  )
+}
+
+/**
+ * Isotope chip selector + per-isotope detail panel. Picking a chip
+ * swaps `displayMass` in the parent, which re-renders the 3D atom with
+ * a new neutron count. The note for the currently-selected isotope is
+ * shown below the chips.
+ */
+function IsotopeSection({
+  symbol,
+  dominantMass,
+  displayMass,
+  isotopes,
+  onSelect,
+  accent,
+}: {
+  symbol: string
+  dominantMass: number
+  displayMass: number
+  isotopes: NonNullable<ReturnType<typeof getElementContent>['isotopes']>
+  onSelect: (massNumber: number) => void
+  accent: string
+}) {
+  // Show the chip that matches the rendered atom as "active". On first
+  // mount this is the dominant (most-abundant) isotope or the closest
+  // mass match to the natural atomic weight.
+  const activeMass = Math.round(displayMass)
+  const active = isotopes.find((i) => i.massNumber === activeMass) ?? isotopes[0]
+  return (
+    <section>
+      <h2 className="mb-2 font-bold text-[10px] text-[#9aa0c8] uppercase tracking-[0.25em]">
+        Isotopes
+      </h2>
+      <div className="flex flex-wrap gap-2">
+        {/* "Natural" chip — restores the standard atomic-weight mass so
+            the rendered atom reflects the textbook average. */}
+        <button
+          type="button"
+          onClick={() => onSelect(dominantMass)}
+          className={chipClass(Math.abs(displayMass - dominantMass) < 0.01, accent)}
+        >
+          Natural mix
+        </button>
+        {isotopes.map((iso) => (
+          <button
+            type="button"
+            key={iso.massNumber}
+            onClick={() => onSelect(iso.massNumber)}
+            className={chipClass(iso.massNumber === activeMass, accent)}
+          >
+            {iso.name ?? `${symbol}-${iso.massNumber}`}
+          </button>
+        ))}
+      </div>
+      {active && (
+        <div className="mt-3 rounded-xl border border-[#2a2655] bg-[#0d0a22]/50 p-4 text-sm">
+          <div className="mb-1 flex flex-wrap items-baseline gap-x-3 gap-y-1 text-[#9aa0c8] text-xs">
+            <span>
+              <span className="text-[#dffaff] font-bold">Mass</span> {active.massNumber}
+            </span>
+            {active.abundance !== undefined && (
+              <span>
+                <span className="text-[#dffaff] font-bold">Abundance</span>{' '}
+                {active.abundance.toFixed(active.abundance < 1 ? 3 : 2)}%
+              </span>
+            )}
+            {active.halfLife && (
+              <span>
+                <span className="text-[#dffaff] font-bold">Half-life</span> {active.halfLife}
+              </span>
+            )}
+          </div>
+          {active.note && <p className="text-[#dffaff] leading-relaxed">{active.note}</p>}
+        </div>
+      )}
+    </section>
+  )
+}
+
+/**
+ * Chip class for the isotope selector. Both states use the SAME border
+ * thickness + identical padding so swapping active state doesn't
+ * change a chip's bounding-box size — the previous active style had
+ * no border at all, which made chips jump by 1px on selection and
+ * cascade-shifted neighbours.
+ */
+function chipClass(active: boolean, _accent: string): string {
+  const base = 'min-h-[32px] rounded-full border px-3 py-1 text-xs font-bold transition-colors'
+  return active
+    ? `${base} border-[#5cc6ff] bg-[#5cc6ff] text-[#07051a]`
+    : `${base} border-[#2a2655] bg-[#0d0a22] text-[#dffaff] hover:border-[#5cc6ff]/50`
+}
+
+/**
+ * Where the element comes from cosmically + abundance breakdown across
+ * crust / body / universe / oceans / atmosphere. Renders compactly so
+ * it slots between the isotopes section and the discovery line without
+ * overwhelming the page.
+ */
+function OriginAbundanceSection({
+  origin,
+  abundance,
+  accent,
+}: {
+  origin?: NonNullable<ReturnType<typeof getElementContent>['origin']>
+  abundance?: NonNullable<ReturnType<typeof getElementContent>['abundance']>
+  accent: string
+}) {
+  const abundanceRows: Array<[string, string | undefined]> = abundance
+    ? ([
+        ['Universe', abundance.universe],
+        ["Earth's crust", abundance.crust],
+        ['Atmosphere', abundance.atmosphere],
+        ['Oceans', abundance.oceans],
+        ['Human body', abundance.body],
+      ].filter(([, v]) => v !== undefined) as Array<[string, string]>)
+    : []
+  return (
+    <section>
+      <h2 className="mb-2 font-bold text-[10px] text-[#9aa0c8] uppercase tracking-[0.25em]">
+        Origin & abundance
+      </h2>
+      {origin && (
+        <div className="mb-3 space-y-2 text-[#dffaff] text-base leading-relaxed">
+          <p>
+            <span className="font-bold" style={{ color: accent }}>
+              How it formed:
+            </span>{' '}
+            {origin.formation}
+          </p>
+          {origin.whereFound && (
+            <p>
+              <span className="font-bold" style={{ color: accent }}>
+                Where you find it:
+              </span>{' '}
+              {origin.whereFound}
+            </p>
+          )}
+        </div>
+      )}
+      {abundanceRows.length > 0 && (
+        <dl className="grid gap-1 rounded-xl border border-[#2a2655] bg-[#0d0a22]/40 p-3 text-sm">
+          {abundanceRows.map(([label, value]) => (
+            <div key={label} className="flex justify-between gap-3">
+              <dt className="text-[#9aa0c8]">{label}</dt>
+              <dd className="text-right text-[#dffaff]">{value}</dd>
+            </div>
+          ))}
+        </dl>
+      )}
+    </section>
   )
 }

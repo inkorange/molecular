@@ -75,36 +75,46 @@ export function Scene({ children, enableBloom = true, interactive = true }: Scen
       }}
       onCreated={({ gl }) => {
         const canvas = gl.domElement
+        // Ignore context-lost events that arrive in the first 600ms
+        // after Canvas creation. Some browsers fire a spurious
+        // contextlost during the initial init handshake before the
+        // context is actually usable — without this guard the user
+        // saw the "renderer lost" recovery UI on a clean first load.
+        const createdAt = performance.now()
         canvas.addEventListener(
           'webglcontextlost',
           (e) => {
-            // preventDefault gives the browser a chance to restore the
-            // context. We still flip to the fallback so the user has
-            // immediate feedback.
             e.preventDefault()
-            console.warn('[Scene] WebGL context lost')
+            const age = performance.now() - createdAt
+            if (age < 600) {
+              console.warn('[Scene] Ignoring early context-lost event', { ageMs: Math.round(age) })
+              return
+            }
+            console.warn('[Scene] WebGL context lost (real)')
             setContextLost(true)
           },
           { passive: false },
         )
         canvas.addEventListener('webglcontextrestored', () => {
-          console.warn('[Scene] WebGL context restored — reload still recommended')
+          console.warn('[Scene] WebGL context restored')
+          setContextLost(false)
         })
         // Explicitly release the GPU context when the renderer is torn
         // down. R3F's default dispose path doesn't always free the
         // context on its own, so navigations between pages with Canvases
-        // can accumulate live contexts until the browser cap (Chrome
-        // ~16) is hit and the OLDEST one is forcibly killed — which
-        // shows up as "WebGLRenderer: Context Lost" on the page the
-        // user just opened.
+        // accumulate live contexts until the browser cap (~16) is hit
+        // and the OLDEST one is forcibly killed. We call the original
+        // dispose FIRST so the renderer's internal cleanup runs, THEN
+        // forceContextLoss to release the slot.
         gl.dispose = ((orig) =>
           function disposeWithCtxLoss(this: typeof gl) {
+            const ret = orig.call(this)
             try {
               gl.forceContextLoss()
             } catch {
               // ignore — context may already be lost
             }
-            return orig.call(this)
+            return ret
           })(gl.dispose)
       }}
     >

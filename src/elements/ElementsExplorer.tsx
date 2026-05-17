@@ -9,6 +9,8 @@ import { ElementDetail } from './ElementDetail'
 import { PeriodicTableGrid } from './PeriodicTableGrid'
 import { PeriodicTableList } from './PeriodicTableList'
 import { TileMorphLayer } from './TileMorphLayer'
+import { TrendSelector } from './TrendSelector'
+import type { ElementViewMode } from './trendOverlay'
 
 interface ElementsExplorerProps {
   /** Slug pre-selected from the URL (when entered at /elements/[slug]).
@@ -91,6 +93,10 @@ export function ElementsExplorer({ initialSlug }: ElementsExplorerProps) {
     mql.addEventListener('change', onChange)
     return () => mql.removeEventListener('change', onChange)
   }, [])
+
+  // Current view mode for the periodic table grid — 'categories' or one
+  // of the four trend keys. Drives tile coloring + the legend strip.
+  const [view, setView] = useState<ElementViewMode>('categories')
 
   // Body scroll position on /elements at the moment we opened a detail.
   // Mobile-only: when the detail opens we scroll the page to the top
@@ -260,14 +266,23 @@ export function ElementsExplorer({ initialSlug }: ElementsExplorerProps) {
       {/* BACKDROP: nav + heading + grid render as a single block that
           dims + blurs together when a detail card opens. From the user's
           POV it's the old grid view going out of focus — they can still
-          see the page they came from peeking through behind the detail. */}
+          see the page they came from peeking through behind the detail.
+          When dimmed, the backdrop is taken OUT of normal flow via
+          `position: fixed` so it doesn't push the page's scroll height
+          to the full grid extent. That fixes a mobile bug where the
+          detail card was short but the page kept scrolling for hundreds
+          more pixels because the (now-blurred) periodic list behind it
+          was much taller than the detail. */}
       <div
         ref={gridContainerRef}
-        className="transition-[opacity,filter] duration-300"
+        className={
+          gridDimmed
+            ? 'pointer-events-none fixed inset-x-0 top-0 mx-auto h-[100dvh] w-full max-w-6xl overflow-hidden px-4 pt-6 transition-[opacity,filter] duration-300 md:px-8 md:pt-12'
+            : 'transition-[opacity,filter] duration-300'
+        }
         style={{
           opacity: gridDimmed ? 0.2 : 1,
           filter: gridDimmed ? 'blur(3px)' : undefined,
-          pointerEvents: gridDimmed ? 'none' : undefined,
         }}
       >
         <nav className="mb-8 flex items-center justify-between">
@@ -307,11 +322,14 @@ export function ElementsExplorer({ initialSlug }: ElementsExplorerProps) {
           </p>
         </header>
 
+        <TrendSelector value={view} onChange={setView} />
+
         {isMd === true && (
           <PeriodicTableGrid
             selectedSlug={hiddenSlug}
             onSelect={handleSelect}
             registerRef={registerRef}
+            view={view}
           />
         )}
         {isMd === false && (
@@ -319,15 +337,17 @@ export function ElementsExplorer({ initialSlug }: ElementsExplorerProps) {
             selectedSlug={hiddenSlug}
             onSelect={handleSelect}
             registerRef={registerRef}
+            view={view}
           />
         )}
       </div>
 
-      {/* Detail overlay — absolute over the whole blurred backdrop so the
-          old grid view (with nav + heading) reads as "where you came
-          from" behind it. */}
+      {/* Detail card — sits in normal flow so its height determines
+          the page's scroll height. The backdrop is fixed-positioned
+          when dimmed (see above) so it doesn't compete with the
+          detail for layout space. */}
       {showDetail && selection && (
-        <div className="absolute inset-x-0 top-0 z-30 px-4 pt-6 pb-16 md:px-8 md:pt-12">
+        <div className="relative z-30">
           <ElementDetail
             element={selection}
             onClose={handleClose}

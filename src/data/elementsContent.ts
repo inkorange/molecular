@@ -12,6 +12,44 @@
  * BCE). The UI renders these as "Known since at least 3000 BCE".
  */
 
+/**
+ * A notable isotope. The 3D atom's neutron count is driven by the
+ * dominant isotope by default; chips on the detail page let the user
+ * swap to one of these and the renderer updates live.
+ */
+export interface IsotopeInfo {
+  /** Mass number (A) = protons + neutrons. Drives the rendered atom. */
+  massNumber: number
+  /** Informal name when it has one ("Deuterium", "Carbon-14"). */
+  name?: string
+  /** Natural abundance, percent. Omit for synthetic isotopes. */
+  abundance?: number
+  /** Half-life shown as text: "stable", "12.3 years", "4.5 × 10⁹ y". */
+  halfLife?: string
+  /** One-sentence note: what it's used for / why it's famous. */
+  note?: string
+}
+
+/**
+ * Where the element comes from cosmically + where you find it today.
+ */
+export interface OriginInfo {
+  /** One-sentence formation story (Big Bang, stellar fusion, supernova
+   *  r-process, lab synthesis…). */
+  formation: string
+  /** Where you find this element in the natural world today. */
+  whereFound?: string
+}
+
+/** Quantitative abundance across contexts a student would meet. */
+export interface AbundanceInfo {
+  crust?: string
+  body?: string
+  universe?: string
+  atmosphere?: string
+  oceans?: string
+}
+
 export interface ElementContent {
   discoveredYear?: number
   discoveredBy?: string
@@ -19,6 +57,12 @@ export interface ElementContent {
   uses?: string[]
   /** One short paragraph (1–3 sentences) for Everyday Examples. */
   everydayExamples?: string
+  /** Notable isotopes — usually 1–4 entries. */
+  isotopes?: IsotopeInfo[]
+  /** Cosmic formation story + earthly distribution. */
+  origin?: OriginInfo
+  /** Abundance across body / crust / universe / oceans / atmosphere. */
+  abundance?: AbundanceInfo
 }
 
 const ANTIQUITY = 'Known since antiquity'
@@ -30,6 +74,40 @@ const CONTENT: Record<number, ElementContent> = {
     uses: ['Rocket fuel', 'Ammonia production', 'Fuel cells', 'Hydrogenating fats'],
     everydayExamples:
       'The most abundant element in the universe. Two hydrogen atoms bond with oxygen to make every drop of water you have ever drunk.',
+    isotopes: [
+      {
+        massNumber: 1,
+        name: 'Protium (¹H)',
+        abundance: 99.985,
+        halfLife: 'stable',
+        note: 'Plain hydrogen — one proton, no neutrons. 99.985% of all hydrogen atoms.',
+      },
+      {
+        massNumber: 2,
+        name: 'Deuterium (²H)',
+        abundance: 0.015,
+        halfLife: 'stable',
+        note: 'Heavy hydrogen — one extra neutron. Used in "heavy water" reactors and as a fusion fuel.',
+      },
+      {
+        massNumber: 3,
+        name: 'Tritium (³H)',
+        halfLife: '12.3 years',
+        note: 'Radioactive. Produced in nuclear reactors, used in glow-in-the-dark exit signs and fusion bombs.',
+      },
+    ],
+    origin: {
+      formation:
+        'Formed in the first three minutes after the Big Bang — hydrogen is older than every star.',
+      whereFound:
+        'On Earth, almost all hydrogen is locked into water and organic molecules. Free H₂ gas leaks to space because it is too light for gravity to hold.',
+    },
+    abundance: {
+      universe: '~75% of all atomic mass',
+      crust: '~0.14% by mass',
+      body: '~10% by mass (mostly in water and organic molecules)',
+      oceans: '~11% by mass',
+    },
   },
   2: {
     discoveredYear: 1868,
@@ -42,6 +120,33 @@ const CONTENT: Record<number, ElementContent> = {
     ],
     everydayExamples:
       'The squeaky-voice gas in birthday balloons. Lighter than air, completely inert — it never reacts with anything else.',
+    isotopes: [
+      {
+        massNumber: 3,
+        name: 'Helium-3',
+        abundance: 0.0002,
+        halfLife: 'stable',
+        note: 'Extremely rare on Earth. Considered a potential clean fusion fuel (lots of it on the Moon).',
+      },
+      {
+        massNumber: 4,
+        name: 'Helium-4',
+        abundance: 99.9998,
+        halfLife: 'stable',
+        note: 'What you actually breathe in a party balloon. Also the alpha particle ejected by radioactive decay.',
+      },
+    ],
+    origin: {
+      formation:
+        'About 24% of all helium formed in Big Bang nucleosynthesis; the rest is forged inside stars by hydrogen fusion (the proton-proton chain).',
+      whereFound:
+        "Most Earth helium is in natural-gas pockets — produced by radioactive alpha decay of uranium and thorium underground over billions of years. It's a non-renewable resource on this planet.",
+    },
+    abundance: {
+      universe: '~24% by mass (second only to hydrogen)',
+      atmosphere: '~5 ppm',
+      crust: 'trace',
+    },
   },
   3: {
     discoveredYear: 1817,
@@ -80,6 +185,40 @@ const CONTENT: Record<number, ElementContent> = {
     uses: ['Pencils (graphite)', 'Diamonds', 'Every living thing', 'Steel (carbon alloys)'],
     everydayExamples:
       'You are mostly carbon. So are diamonds, charcoal, and the graphite in pencils — all the same element in different bonding arrangements.',
+    isotopes: [
+      {
+        massNumber: 12,
+        name: 'Carbon-12',
+        abundance: 98.9,
+        halfLife: 'stable',
+        note: 'The reference for the atomic mass unit. The carbon in your body is almost all this.',
+      },
+      {
+        massNumber: 13,
+        name: 'Carbon-13',
+        abundance: 1.1,
+        halfLife: 'stable',
+        note: 'Used in NMR spectroscopy and to trace where carbon goes in chemistry experiments.',
+      },
+      {
+        massNumber: 14,
+        name: 'Carbon-14',
+        halfLife: '5,730 years',
+        note: 'Trace radioactive isotope produced when cosmic rays hit nitrogen in the atmosphere. The basis of carbon dating.',
+      },
+    ],
+    origin: {
+      formation:
+        'Forged inside dying red-giant stars by the triple-alpha process: three helium nuclei fuse into one carbon nucleus. Every carbon atom in your body came from inside a star.',
+      whereFound:
+        "Carbon is everywhere life is — DNA, proteins, sugars, fats, coal, oil, diamonds, and limestone (CaCO₃). The Earth's crust is only ~0.18% carbon, but it's the structural backbone of biochemistry.",
+    },
+    abundance: {
+      universe: '4th most abundant element',
+      crust: '~0.18% by mass',
+      body: '~18% by mass (second only to oxygen)',
+      atmosphere: '~0.04% (as CO₂, rising)',
+    },
   },
   7: {
     discoveredYear: 1772,
@@ -92,6 +231,34 @@ const CONTENT: Record<number, ElementContent> = {
     ],
     everydayExamples:
       '78% of the air you breathe. Liquid nitrogen freezes ice cream into snack-size beads at carnival stands.',
+    isotopes: [
+      {
+        massNumber: 14,
+        name: 'Nitrogen-14',
+        abundance: 99.6,
+        halfLife: 'stable',
+        note: "Almost all nitrogen on Earth — including everything you've ever inhaled.",
+      },
+      {
+        massNumber: 15,
+        name: 'Nitrogen-15',
+        abundance: 0.4,
+        halfLife: 'stable',
+        note: 'Used in NMR studies of proteins; also useful for tracking fertiliser uptake in plants.',
+      },
+    ],
+    origin: {
+      formation:
+        'Made inside stars in the CNO cycle (a hydrogen-burning fusion pathway catalyzed by carbon, nitrogen, and oxygen nuclei).',
+      whereFound:
+        'Most of it sits in the atmosphere as N₂. Plants need nitrogen to make proteins but can only use the "fixed" form (NH₃ or NO₃⁻) — that fixing happens in bacterial root nodules and in industrial Haber-Bosch reactors.',
+    },
+    abundance: {
+      universe: '7th most abundant',
+      atmosphere: '~78% by volume',
+      crust: '~0.002%',
+      body: '~3% by mass',
+    },
   },
   8: {
     discoveredYear: 1774,
@@ -99,6 +266,41 @@ const CONTENT: Record<number, ElementContent> = {
     uses: ['Breathing', 'Steelmaking', 'Rocket fuel oxidizer', 'Medical ventilators'],
     everydayExamples:
       'You inhale 11,000 liters of air containing this every day. Iron rusts because oxygen pulls electrons off the metal.',
+    isotopes: [
+      {
+        massNumber: 16,
+        name: 'Oxygen-16',
+        abundance: 99.76,
+        halfLife: 'stable',
+        note: 'The dominant oxygen isotope — most of the oxygen in air, water, and rocks.',
+      },
+      {
+        massNumber: 17,
+        name: 'Oxygen-17',
+        abundance: 0.04,
+        halfLife: 'stable',
+      },
+      {
+        massNumber: 18,
+        name: 'Oxygen-18',
+        abundance: 0.2,
+        halfLife: 'stable',
+        note: 'Ratio of ¹⁸O to ¹⁶O in ice cores and seashells is how we measure ancient climate.',
+      },
+    ],
+    origin: {
+      formation:
+        'Forged in massive stars during helium fusion (¹²C + ⁴He → ¹⁶O) and scattered across the galaxy when those stars explode as supernovae.',
+      whereFound:
+        "Most abundant element in the Earth's crust by mass — locked up in silicate rocks, water, and the atmosphere. Free O₂ in the air only exists because cyanobacteria started photosynthesizing 2.4 billion years ago.",
+    },
+    abundance: {
+      universe: '3rd most abundant',
+      crust: '~46% by mass (most abundant)',
+      body: '~65% by mass (most abundant)',
+      atmosphere: '~21% by volume',
+      oceans: '~86% by mass',
+    },
   },
   9: {
     discoveredYear: 1886,
@@ -125,6 +327,26 @@ const CONTENT: Record<number, ElementContent> = {
     uses: ['Table salt (with chlorine)', 'Streetlights (orange glow)', 'Soap', 'Baking soda'],
     everydayExamples:
       'Half of every salt shaker. Also responsible for the warm orange streetlight color on old highways.',
+    isotopes: [
+      {
+        massNumber: 23,
+        name: 'Sodium-23',
+        abundance: 100,
+        halfLife: 'stable',
+        note: 'The only natural sodium isotope. All the sodium in your blood, in salt, and in soap is this one.',
+      },
+    ],
+    origin: {
+      formation:
+        'Forged in massive stars by carbon burning (²¹Ne fuses upward via the rp-process) and scattered by supernovae.',
+      whereFound:
+        'Sodium is so reactive it never exists pure in nature — only as ions. Rock salt (NaCl) deposits, sea water, and the brines of dry lakes. Your blood plasma carries 0.4% sodium by weight.',
+    },
+    abundance: {
+      crust: '~2.3% by mass (6th most abundant)',
+      oceans: '~1.1% by mass',
+      body: '~0.15% by mass (in blood and extracellular fluid)',
+    },
   },
   12: {
     discoveredYear: 1808,
@@ -137,6 +359,38 @@ const CONTENT: Record<number, ElementContent> = {
     ],
     everydayExamples:
       'The metal that makes magnesium-flare fireworks burn dazzling white. Also at the center of every chlorophyll molecule.',
+    isotopes: [
+      {
+        massNumber: 24,
+        name: 'Magnesium-24',
+        abundance: 79,
+        halfLife: 'stable',
+      },
+      {
+        massNumber: 25,
+        name: 'Magnesium-25',
+        abundance: 10,
+        halfLife: 'stable',
+      },
+      {
+        massNumber: 26,
+        name: 'Magnesium-26',
+        abundance: 11,
+        halfLife: 'stable',
+        note: 'Excess ²⁶Mg in meteorites is a fingerprint of extinct ²⁶Al — evidence of supernova material in the early solar system.',
+      },
+    ],
+    origin: {
+      formation:
+        'Built inside massive stars during carbon and neon burning, then ejected by supernovae. Plants pull it from soil to build chlorophyll.',
+      whereFound:
+        '8th most abundant element on Earth. Sea water is rich in Mg²⁺ ions; the metal is industrially extracted by electrolysis of molten MgCl₂. Every chlorophyll molecule has one Mg atom at its center.',
+    },
+    abundance: {
+      crust: '~2.3% by mass (8th most abundant)',
+      body: '~0.05%',
+      oceans: '~0.13%',
+    },
   },
   13: {
     discoveredYear: 1825,
@@ -144,6 +398,25 @@ const CONTENT: Record<number, ElementContent> = {
     uses: ['Soda cans', 'Aircraft frames', 'Foil and cooking pans', 'Power transmission lines'],
     everydayExamples:
       'Most-used metal after iron. Light, cheap, and recyclable — your soda can today might be airplane skin next year.',
+    isotopes: [
+      {
+        massNumber: 27,
+        name: 'Aluminum-27',
+        abundance: 100,
+        halfLife: 'stable',
+        note: 'The only stable aluminum isotope.',
+      },
+    ],
+    origin: {
+      formation:
+        'Forged in massive stars by oxygen burning and ejected in supernovae. Until 1886 it was as expensive as silver because nobody could economically reduce aluminum oxide.',
+      whereFound:
+        "Most-abundant metal in the Earth's crust (~8%). Always bound to oxygen as bauxite (Al₂O₃·2H₂O) until refined. The Hall–Héroult process (electrolysis of molten alumina) drops the price by 1000× and made aluminum the everyday metal it is now.",
+    },
+    abundance: {
+      crust: '~8.1% by mass (most abundant metal, 3rd overall)',
+      body: 'trace',
+    },
   },
   14: {
     discoveredYear: 1824,
@@ -156,6 +429,36 @@ const CONTENT: Record<number, ElementContent> = {
     ],
     everydayExamples:
       'The second-most abundant element in Earth’s crust. Every computer chip and every grain of beach sand.',
+    isotopes: [
+      {
+        massNumber: 28,
+        name: 'Silicon-28',
+        abundance: 92.2,
+        halfLife: 'stable',
+      },
+      {
+        massNumber: 29,
+        name: 'Silicon-29',
+        abundance: 4.7,
+        halfLife: 'stable',
+      },
+      {
+        massNumber: 30,
+        name: 'Silicon-30',
+        abundance: 3.1,
+        halfLife: 'stable',
+      },
+    ],
+    origin: {
+      formation:
+        "Made in massive stars by oxygen burning. The 'silicon-burning' stage that follows is the LAST gasp of fusion before the star runs out of usable fuel and collapses into a supernova.",
+      whereFound:
+        "Second-most abundant element in the Earth's crust (after oxygen). Locked into silicate minerals: quartz, feldspar, mica. Refined into 99.9999% pure ingots for semiconductor wafers — the basis of every modern computer.",
+    },
+    abundance: {
+      crust: '~28% by mass (2nd most abundant)',
+      universe: '~0.07%',
+    },
   },
   15: {
     discoveredYear: 1669,
@@ -182,6 +485,32 @@ const CONTENT: Record<number, ElementContent> = {
     uses: ['Drinking-water disinfection', 'Bleach', 'PVC plastic', 'Table salt (with sodium)'],
     everydayExamples:
       'Keeps swimming pools clean and tap water safe. The other half of every salt shaker.',
+    isotopes: [
+      {
+        massNumber: 35,
+        name: 'Chlorine-35',
+        abundance: 75.8,
+        halfLife: 'stable',
+      },
+      {
+        massNumber: 37,
+        name: 'Chlorine-37',
+        abundance: 24.2,
+        halfLife: 'stable',
+        note: 'The two stable chlorine isotopes give chlorine its peculiar 35.45 average atomic mass.',
+      },
+    ],
+    origin: {
+      formation:
+        'Forged in oxygen-burning stages of massive stars and dispersed by supernovae. Reactive enough that it never exists pure in nature — always as Cl⁻ ions or Cl₂ in compounds.',
+      whereFound:
+        'Mostly in dissolved salt: oceans contain ~1.9% chloride ions. Rock-salt deposits, salt flats, and the brine pumped out for industrial chlorine production. Your stomach makes HCl to digest food.',
+    },
+    abundance: {
+      crust: '~0.014%',
+      oceans: '~1.9% (as Cl⁻)',
+      body: '~0.15%',
+    },
   },
   18: {
     discoveredYear: 1894,
@@ -206,6 +535,37 @@ const CONTENT: Record<number, ElementContent> = {
     ],
     everydayExamples:
       'The reason a banana is a healthy snack. Every nerve impulse in your body depends on potassium ions crossing cell membranes.',
+    isotopes: [
+      {
+        massNumber: 39,
+        name: 'Potassium-39',
+        abundance: 93.26,
+        halfLife: 'stable',
+      },
+      {
+        massNumber: 40,
+        name: 'Potassium-40',
+        abundance: 0.012,
+        halfLife: '1.25 × 10⁹ years',
+        note: 'Naturally radioactive — about 0.012% of all potassium. Bananas (and you) emit measurable beta radiation from this isotope. The basis of K-Ar rock dating.',
+      },
+      {
+        massNumber: 41,
+        name: 'Potassium-41',
+        abundance: 6.73,
+        halfLife: 'stable',
+      },
+    ],
+    origin: {
+      formation: 'Built in massive stars by silicon burning, then released by supernovae.',
+      whereFound:
+        "Earth's crust holds ~2% potassium, mostly in feldspar minerals and salt deposits. Plants pull it from soil; you get it from bananas, potatoes, and leafy greens. Inside your cells, K⁺ is the dominant positive ion.",
+    },
+    abundance: {
+      crust: '~2.1% by mass (7th most abundant)',
+      body: '~0.4% (mostly inside cells)',
+      oceans: '~0.04%',
+    },
   },
   20: {
     discoveredYear: 1808,
@@ -213,6 +573,40 @@ const CONTENT: Record<number, ElementContent> = {
     uses: ['Bones and teeth', 'Cement and plaster', 'Eggshells', 'Antacids (TUMS)'],
     everydayExamples:
       'The reason your bones are strong and your teeth bite. Chalk, marble, and seashells are all calcium carbonate.',
+    isotopes: [
+      {
+        massNumber: 40,
+        name: 'Calcium-40',
+        abundance: 96.94,
+        halfLife: 'stable',
+        note: 'The dominant isotope — the calcium in your bones is mostly this.',
+      },
+      {
+        massNumber: 44,
+        name: 'Calcium-44',
+        abundance: 2.09,
+        halfLife: 'stable',
+      },
+      {
+        massNumber: 48,
+        name: 'Calcium-48',
+        abundance: 0.187,
+        halfLife: '4 × 10¹⁹ years',
+        note: 'Technically radioactive but with a half-life billions of times the age of the universe — effectively stable.',
+      },
+    ],
+    origin: {
+      formation:
+        "Forged in massive stars by 'silicon burning' — silicon nuclei fuse upward through sulfur, argon, and calcium during the final hours before the star goes supernova.",
+      whereFound:
+        "5th most abundant element in the Earth's crust. Locked into limestone (CaCO₃), gypsum, and bones. The white cliffs of Dover are pure calcium carbonate from compressed plankton shells.",
+    },
+    abundance: {
+      crust: '~4.2% by mass (5th most abundant)',
+      body: '~1.5% by mass (mostly in bones and teeth)',
+      universe: '~0.007%',
+      oceans: '~0.04%',
+    },
   },
   21: {
     discoveredYear: 1879,
@@ -265,6 +659,44 @@ const CONTENT: Record<number, ElementContent> = {
     ],
     everydayExamples:
       'The most-used metal on Earth — every skyscraper, every car, every cast-iron pan. Also what makes your blood red.',
+    isotopes: [
+      {
+        massNumber: 54,
+        name: 'Iron-54',
+        abundance: 5.8,
+        halfLife: 'stable',
+      },
+      {
+        massNumber: 56,
+        name: 'Iron-56',
+        abundance: 91.8,
+        halfLife: 'stable',
+        note: 'The most stable nucleus in the universe — has the highest binding energy per nucleon. The end point of stellar fusion.',
+      },
+      {
+        massNumber: 57,
+        name: 'Iron-57',
+        abundance: 2.1,
+        halfLife: 'stable',
+      },
+      {
+        massNumber: 58,
+        name: 'Iron-58',
+        abundance: 0.3,
+        halfLife: 'stable',
+      },
+    ],
+    origin: {
+      formation:
+        "Forged at the end of a massive star's life — iron is where fusion stops paying off. Stars 8+ solar masses build iron cores, can't generate more energy, and collapse into supernovae that scatter iron across the galaxy.",
+      whereFound:
+        "The Earth's inner and outer cores are mostly iron. The crust holds the iron we mine (banded iron formations laid down when early life first oxygenated the oceans). Your blood carries 4 grams of iron in hemoglobin.",
+    },
+    abundance: {
+      universe: '6th most abundant',
+      crust: '~5% by mass (4th most abundant)',
+      body: '~0.006% (4 grams in adult)',
+    },
   },
   27: {
     discoveredYear: 1735,
@@ -806,6 +1238,25 @@ const CONTENT: Record<number, ElementContent> = {
     ],
     everydayExamples:
       'Civilization’s favorite metal for 6,000 years. Spacecraft windows are gold-coated to reflect infrared. Every smartphone has a few cents of gold on its circuit board.',
+    isotopes: [
+      {
+        massNumber: 197,
+        name: 'Gold-197',
+        abundance: 100,
+        halfLife: 'stable',
+        note: 'The only natural gold isotope. All gold on Earth is this one.',
+      },
+    ],
+    origin: {
+      formation:
+        "Forged in the most violent events in the universe — neutron-star mergers and the supernovae of very massive stars. The 'r-process' (rapid neutron capture) builds heavy elements like gold in seconds, then ejects them into space.",
+      whereFound:
+        "Mined from veins formed when hot fluids deposit gold inside cracks in rock. The Earth's crust has 4 ppb gold; most of the planet's gold sank into the core during formation and is unreachable.",
+    },
+    abundance: {
+      crust: '~4 ppb (parts per billion)',
+      universe: 'trace',
+    },
   },
   80: {
     discoveredYear: -1500,
@@ -924,6 +1375,39 @@ const CONTENT: Record<number, ElementContent> = {
     ],
     everydayExamples:
       'The heaviest naturally-occurring element. Fissioning a single uranium-235 atom releases enough energy to lift a textbook off the ground — multiply by trillions and you get a nuclear reactor.',
+    isotopes: [
+      {
+        massNumber: 234,
+        name: 'Uranium-234',
+        abundance: 0.005,
+        halfLife: '245,500 years',
+        note: 'Trace isotope, part of the U-238 decay chain.',
+      },
+      {
+        massNumber: 235,
+        name: 'Uranium-235',
+        abundance: 0.72,
+        halfLife: '7.04 × 10⁸ years',
+        note: 'Fissile — splits in a chain reaction. The fuel of nuclear reactors and the Hiroshima bomb.',
+      },
+      {
+        massNumber: 238,
+        name: 'Uranium-238',
+        abundance: 99.27,
+        halfLife: '4.47 × 10⁹ years',
+        note: 'Not fissile but "fertile" — neutron capture turns it into plutonium-239 (which IS fissile). Used in tank armor and depleted-uranium munitions.',
+      },
+    ],
+    origin: {
+      formation:
+        "Forged in neutron-star mergers and the supernovae of very massive stars (the r-process, same as gold but at the heavy end of what's possible). Every uranium atom predates the solar system.",
+      whereFound:
+        "Mined from ores like uraninite (UO₂) and pitchblende. The Earth's crust averages ~3 ppm uranium — more abundant than silver. Half of the planet's internal heat comes from radioactive decay of uranium, thorium, and potassium-40.",
+    },
+    abundance: {
+      crust: '~2.7 ppm',
+      oceans: '~3.3 ppb',
+    },
   },
   93: {
     discoveredYear: 1940,
@@ -1124,6 +1608,118 @@ const CONTENT: Record<number, ElementContent> = {
 
 const EMPTY: ElementContent = {}
 
+/**
+ * Programmatic fallback origin story based on atomic number. Stellar
+ * nucleosynthesis follows well-known phase rules — Big Bang for H/He,
+ * cosmic-ray spallation for Li/Be/B, stellar fusion up through iron,
+ * neutron-capture processes for the heavies, and lab synthesis past
+ * Z=92. This means every element gets a non-empty answer when a
+ * student is curious, even before someone writes an element-specific
+ * description.
+ *
+ * The handful of elements above with an explicit `origin` in CONTENT
+ * override this default.
+ */
+function defaultOrigin(Z: number): OriginInfo {
+  if (Z === 1)
+    return {
+      formation: 'Formed in the first three minutes after the Big Bang — older than every star.',
+      whereFound:
+        "Almost all hydrogen is locked into water and organic molecules. Free H₂ leaks away because Earth's gravity is too weak to hold it.",
+    }
+  if (Z === 2)
+    return {
+      formation:
+        'About 24% from Big Bang nucleosynthesis; the rest forged inside stars by hydrogen fusion.',
+      whereFound:
+        'Trapped in natural-gas pockets from billions of years of alpha decay underground. Non-renewable on Earth — what we vent into the air leaks to space.',
+    }
+  if (Z === 3)
+    return {
+      formation:
+        'A trace amount formed in the Big Bang. Most lithium today was made by cosmic-ray spallation — high-energy particles fragmenting carbon and oxygen nuclei in interstellar space.',
+      whereFound:
+        'Mined from brine pools in salt flats (Chile, Australia) and from spodumene rock. Concentrated in granitic pegmatites.',
+    }
+  if (Z >= 4 && Z <= 5)
+    return {
+      formation:
+        'Made by cosmic-ray spallation — high-energy cosmic rays hitting heavier nuclei (especially carbon and oxygen) and fragmenting them. Not produced in significant amounts by stellar fusion.',
+      whereFound:
+        'Concentrated by long geological cycles into specific mineral deposits — rarely found in pure form.',
+    }
+  if (Z >= 6 && Z <= 8)
+    return {
+      formation:
+        'Forged inside red-giant stars: carbon by the triple-alpha process (three helium nuclei merging), then nitrogen and oxygen by successive helium captures and the CNO cycle.',
+      whereFound:
+        "Every atom in your body that isn't hydrogen came from inside a star. Carried into the interstellar medium by AGB-star winds and supernova ejecta.",
+    }
+  if (Z >= 9 && Z <= 20)
+    return {
+      formation:
+        'Forged in massive stars by successive burning stages — neon burning, oxygen burning, silicon burning — each requiring hotter, denser conditions than the last. Ejected when those stars go supernova.',
+      whereFound:
+        "Concentrated by geological processes into specific ores or mineral deposits. Common in seawater and the Earth's crust as ions and oxides.",
+    }
+  if (Z >= 21 && Z <= 26)
+    return {
+      formation:
+        'Built up in massive stars during silicon burning — the final stable fusion stage before the iron core collapses into a supernova. Iron is the end point: heavier elements consume rather than release energy when fused.',
+      whereFound:
+        "Earth's iron-rich core formed from these elements sinking during planetary differentiation. The crust still holds enough for ores at concentrated deposits.",
+    }
+  if (Z >= 27 && Z <= 41)
+    return {
+      formation:
+        'Made by the s-process (slow neutron capture) inside AGB stars and the r-process (rapid neutron capture) in supernovae. The exact mix depends on neutron-density conditions where each isotope formed.',
+      whereFound:
+        'Concentrated in specific ore bodies through hydrothermal and magmatic processes. Often co-located with related transition metals.',
+    }
+  if (Z >= 42 && Z <= 56)
+    return {
+      formation:
+        'Built primarily by the s-process in AGB stars (slow neutron capture over millennia) and the r-process in supernovae (seconds-long bursts of neutron capture). Distributed across the galaxy by stellar winds and explosions.',
+      whereFound:
+        'Mined from specific ore minerals, often as a byproduct of more abundant metal refining. Concentrations vary by region.',
+    }
+  if (Z >= 57 && Z <= 71)
+    return {
+      formation:
+        'Forged primarily by the r-process in supernovae and neutron-star mergers. The lanthanide elements are chemically so similar that they often co-occur in the same ore minerals.',
+      whereFound:
+        "Despite the name 'rare earth', most lanthanides are more abundant than gold or silver in the crust. They're 'rare' only in the sense that they rarely concentrate into mineable deposits — usually scattered through other ores.",
+    }
+  if (Z >= 72 && Z <= 83)
+    return {
+      formation:
+        'Forged by r-process nucleosynthesis in neutron-star mergers and the supernovae of massive stars. Every atom of these heavy elements predates the solar system.',
+      whereFound:
+        "Concentrated in specific hydrothermal ore deposits. Several (Re, Os, Ir, Pt) are among the rarest elements in the Earth's crust.",
+    }
+  if (Z >= 84 && Z <= 92)
+    return {
+      formation:
+        "Forged primarily in neutron-star mergers via the r-process. The radioactive elements above bismuth would all have decayed away by now if they weren't continuously regenerated — uranium and thorium survive only because their half-lives match the age of Earth.",
+      whereFound:
+        "Mined from specific uranium / thorium ore bodies. Some (radon, polonium) exist only transiently as decay products. Half the Earth's internal heat comes from radioactive decay of these elements.",
+    }
+  // Z >= 93 — synthetic transuranics + transactinides.
+  return {
+    formation:
+      'Synthetic — produced in nuclear reactors (neutron-rich isotopes) and heavy-ion accelerators (transactinides). Does not exist naturally on Earth in measurable quantities.',
+    whereFound:
+      'Only in physics laboratories. Trace amounts exist in spent nuclear-reactor fuel; individual atoms of the heaviest elements are detected one at a time after accelerator collisions.',
+  }
+}
+
 export function getElementContent(Z: number): ElementContent {
-  return CONTENT[Z] ?? EMPTY
+  const explicit = CONTENT[Z] ?? EMPTY
+  // Merge explicit content with a programmatic default-origin so every
+  // element has a "where does this come from?" answer. Explicit always
+  // wins; defaults fill in the gaps.
+  return {
+    ...explicit,
+    origin: explicit.origin ?? defaultOrigin(Z),
+  }
 }
