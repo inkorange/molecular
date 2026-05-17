@@ -84,7 +84,11 @@ export function LabMolecule({ moleculeId, atoms, bonds, onCollideWith }: LabMole
         />
       ))}
       {localAtoms.map((a) => (
-        <Atom key={a.id} Z={a.Z} position={a.localPos} />
+        // Pass atomId so the element-detail popup (rendered above the
+        // periodic card billboard inside <Atom>) is enabled in lab
+        // mode too — without it, the card's onClick is gated off and
+        // tapping the card silently does nothing.
+        <Atom key={a.id} atomId={a.id} Z={a.Z} position={a.localPos} />
       ))}
       {bonds.map((b) => {
         const a = localAtoms.find((x) => x.id === b.atomA)

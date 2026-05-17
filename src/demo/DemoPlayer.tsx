@@ -2,18 +2,23 @@
 
 import { PerspectiveCamera } from '@react-three/drei'
 import { useFrame, useThree } from '@react-three/fiber'
-import { ArrowLeft, ArrowRight } from 'lucide-react'
+import { ArrowLeft, ArrowRight, Sparkles } from 'lucide-react'
 import Link from 'next/link'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { PerspectiveCamera as PerspectiveCameraImpl } from 'three'
+import { Sheet, SheetContent, SheetTitle, SheetTrigger } from '@/components/ui/sheet'
 import type { Atom as AtomData, Bond as BondData } from '@/src/chem/types'
 import type { Demonstration } from '@/src/data/demonstrations'
 import { Molecule } from '@/src/scene/Molecule'
 import { Scene } from '@/src/scene/Scene'
+import { TutorPanel } from '@/src/ui/TutorPanel'
 import { AnimatedMolecule } from './AnimatedMolecule'
 import { buildIngredientScene, buildProductLayout, getReactionMetadata } from './buildDemoScene'
+import { EnergyDisplay } from './EnergyDisplay'
+import { FreeParticleField } from './FreeParticleField'
 import { LightningEffect } from './LightningEffect'
 import { MoleculeLabel } from './MoleculeLabel'
+import { NuclearEffect } from './NuclearEffect'
 import { ReactionEffect } from './ReactionEffect'
 import { TransitionFlash } from './TransitionFlash'
 
@@ -26,6 +31,90 @@ const STEP_LABEL: Record<Step, string> = {
   ingredients: 'Ingredients',
   combine: 'Combine',
   results: 'Results',
+}
+
+// Per-reaction-kind verb for the middle step. The default "Combine"
+// only fits synthesis demos — for decomposition, fission, decay, etc.
+// it's misleading. Drives both the action button ("Combine" → press
+// to combine) and the step-progress label ("Step 2 · Combine"). Keep
+// each entry an imperative verb so it reads cleanly in both contexts.
+const ACTION_VERB: Record<Demonstration['effectKind'], string> = {
+  synthesis: 'Combine',
+  combustion: 'Ignite',
+  decomposition: 'Decompose',
+  neutralization: 'Neutralize',
+  displacement: 'Displace',
+  fusion: 'Fuse',
+  fission: 'Split',
+  decay: 'Decay',
+}
+
+// Stable suggestion chips per step. Generic enough to apply across
+// every demo, but step-specific so the tutor is asked relevant
+// questions for what the student is currently looking at.
+const TUTOR_SUGGESTIONS: Record<Step, readonly string[]> = {
+  ingredients: [
+    'What are these atoms doing here?',
+    'Why does this reaction need exactly these ingredients?',
+    'What is about to happen?',
+  ],
+  combine: [
+    'Where does the energy come from?',
+    'Why does this reaction work?',
+    'What is happening at the atomic level?',
+  ],
+  results: [
+    'What is this reaction used for?',
+    'Why is the energy released so large?',
+    'Where does this reaction occur in nature?',
+  ],
+}
+
+/**
+ * Build the tutor's context string for the current demo + step. Includes
+ * the demo title, reaction-type, products / free particles / energy, and
+ * the current step's audience-level explanation — so the tutor answers
+ * are grounded in exactly what the student is looking at.
+ */
+function buildDemoContext(demo: Demonstration, step: Step, level: Level): string {
+  const ingredients = demo.ingredients
+    .map((i) =>
+      i.kind === 'library' ? `${i.count} ${i.libraryId}` : `${i.count} atom(s) Z=${i.Z}`,
+    )
+    .join(', ')
+  const products = demo.products
+    ? demo.products
+        .map((p) =>
+          p.kind === 'library' ? `${p.count} ${p.libraryId}` : `${p.count} atom(s) Z=${p.Z}`,
+        )
+        .join(', ')
+    : 'derived from engine'
+  const freeParticles =
+    demo.freeParticles?.map((p) => `${p.count} ${p.kind}${p.count === 1 ? '' : 's'}`).join(', ') ??
+    'none'
+  const energy =
+    demo.energyScale && demo.energyScale > 0
+      ? `${demo.energyLabel ?? `level ${demo.energyScale}/5`} (relative scale ${demo.energyScale}/5)`
+      : 'endothermic or near-neutral'
+  return [
+    `Demonstration: "${demo.title}" (${demo.reactionType})`,
+    `Summary: ${demo.summary}`,
+    `Ingredients: ${ingredients}`,
+    `Products: ${products}`,
+    `Free particles emitted: ${freeParticles}`,
+    `Energy released: ${energy}`,
+    `Current step: ${step}`,
+    `Student-facing description of this step: ${demo.steps[step][level]}`,
+  ].join('\n')
+}
+
+/**
+ * Map the demo player's audience level ("elementary" | "advanced") to
+ * the tutor API's tier vocabulary ("beginner" | "standard" | "advanced").
+ * Elementary collapses to beginner; advanced stays advanced.
+ */
+function levelToTier(level: Level): 'beginner' | 'standard' | 'advanced' {
+  return level === 'elementary' ? 'beginner' : 'advanced'
 }
 
 // Length of the ingredients→combine transition. Long enough for the
@@ -65,6 +154,12 @@ const REACTION_TYPE_COLOR: Record<string, string> = {
   decomposition: '#c89eff',
   neutralization: '#a4ff8c',
   displacement: '#ffd97a',
+  // Nuclear types share the same hue family as the corresponding flash
+  // colors in TransitionFlash so the top-bar badge and the combine
+  // flash read as the same event.
+  fusion: '#5cc6ff',
+  fission: '#ff5a3a',
+  decay: '#a4ff8c',
 }
 
 interface DemoPlayerProps {
@@ -87,6 +182,7 @@ export function DemoPlayer({ demo, initialLevel }: DemoPlayerProps) {
   const [transitionStartedAt, setTransitionStartedAt] = useState<number | null>(null)
   const [level] = useState<Level>(initialLevel)
   const [shareToast, setShareToast] = useState<string | null>(null)
+  const [tutorOpen, setTutorOpen] = useState(false)
 
   const reaction = useMemo(() => getReactionMetadata(demo.reactionId), [demo.reactionId])
   const ingredientScene = useMemo(() => buildIngredientScene(demo.ingredients), [demo.ingredients])
@@ -119,8 +215,46 @@ export function DemoPlayer({ demo, initialLevel }: DemoPlayerProps) {
         pts.push([tx + a.position[0] * s, ty + a.position[1] * s, tz + a.position[2] * s])
       }
     }
+    // Include the energy cloud and free-particle ring in the bounding
+    // set so the auto-fit camera frames the WHOLE Results scene, not
+    // just the product atoms. Without these, the cloud above and the
+    // neutron sprites on the upper ring would sit off-screen at the
+    // top of the viewport.
+    //
+    // Coordinates here have to mirror what EnergyDisplay and
+    // FreeParticleField actually render. Worth refactoring those into
+    // shared layout constants if the geometry drifts again.
+    if (demo.energyScale && demo.energyScale > 0) {
+      // EnergyDisplay sits at [0, 1.5, -2.5] (pulled back in z so the
+      // cloud doesn't overlap wide product layouts like propane
+      // combustion). Level-scaled radius is BASE_SIZE=1.0 +
+      // scale*SIZE_PER_LEVEL=0.36. Include the cloud's outermost
+      // extent including the z offset so the auto-fit knows the cloud
+      // sits behind origin.
+      const cloudY = 1.5
+      const cloudZ = -2.5
+      const cloudReach = (1.0 + demo.energyScale * 0.36) / 2
+      pts.push([0, cloudY + cloudReach, cloudZ])
+      pts.push([cloudReach, cloudY, cloudZ])
+      pts.push([-cloudReach, cloudY, cloudZ])
+      pts.push([0, cloudY, cloudZ - cloudReach])
+    }
+    if (demo.freeParticles && demo.freeParticles.length > 0) {
+      // FreeParticleField positions particles on a tilted ring centered
+      // at y=0.4 with ringRadius=3.6 and VERTICAL_FLATTEN=0.45, so the
+      // topmost slot reaches y = 0.4 + 3.6*0.45 ≈ 2.0 and the bottom
+      // reaches y ≈ -1.2. Include the top/bottom/left/right of that
+      // ring so the camera frames it all.
+      const ringCenterY = 0.4
+      const ringRadius = 3.6
+      const ringVerticalReach = ringRadius * 0.45
+      pts.push([0, ringCenterY + ringVerticalReach, 0.3])
+      pts.push([0, ringCenterY - ringVerticalReach, 0.3])
+      pts.push([-ringRadius, ringCenterY, 0.3])
+      pts.push([ringRadius, ringCenterY, 0.3])
+    }
     return pts
-  }, [productLayout])
+  }, [productLayout, demo.energyScale, demo.freeParticles])
 
   const isTransitioning = transitionStartedAt !== null
   const stepIndex = STEP_ORDER.indexOf(step)
@@ -242,11 +376,27 @@ export function DemoPlayer({ demo, initialLevel }: DemoPlayerProps) {
                   targetScale={unit.scale}
                 />
               ))}
-              <ReactionEffect
-                kind={demo.effectKind}
-                phaseStartedAt={transitionStartedAt}
-                durationMs={TRANSITION_MS}
-              />
+              {/* Chemistry effect vs nuclear effect — same role (driving
+                  particle vocabulary for the combine transition) but the
+                  motion language is different enough that nuclear demos
+                  get their own component. NuclearEffect implements the
+                  fusion-converge and fission-shatter recipes with neutron
+                  ejection; ReactionEffect handles the five chemistry kinds. */}
+              {demo.effectKind === 'fusion' ||
+              demo.effectKind === 'fission' ||
+              demo.effectKind === 'decay' ? (
+                <NuclearEffect
+                  kind={demo.effectKind}
+                  phaseStartedAt={transitionStartedAt}
+                  durationMs={TRANSITION_MS}
+                />
+              ) : (
+                <ReactionEffect
+                  kind={demo.effectKind}
+                  phaseStartedAt={transitionStartedAt}
+                  durationMs={TRANSITION_MS}
+                />
+              )}
               {/* Environmental driver overlay — lightning bolts for
                   electricity-driven reactions (e.g. water electrolysis).
                   Stacks on top of the regular reaction-type effect so
@@ -287,6 +437,20 @@ export function DemoPlayer({ demo, initialLevel }: DemoPlayerProps) {
                     {unit.libraryId && <MoleculeLabel libraryId={unit.libraryId} />}
                   </group>
                 ))}
+                {/* Free particles released by the reaction (neutrons,
+                    photons) — rendered alongside the products so the
+                    conservation of matter/energy is visible. Skipped
+                    when the demo declared none. */}
+                {demo.freeParticles && demo.freeParticles.length > 0 && (
+                  <FreeParticleField particles={demo.freeParticles} />
+                )}
+                {/* Energy-release gauge. Vertical thermometer-style bar
+                    on the right of the scene + a swarm of ambient
+                    quanta. Hidden for endothermic / neutral reactions
+                    (energyScale=0 or undefined). */}
+                {demo.energyScale !== undefined && demo.energyScale > 0 && (
+                  <EnergyDisplay scale={demo.energyScale} label={demo.energyLabel} />
+                )}
               </group>
             </>
           )}
@@ -318,14 +482,50 @@ export function DemoPlayer({ demo, initialLevel }: DemoPlayerProps) {
             </span>
           </div>
         </div>
-        <button
-          type="button"
-          onClick={share}
-          className="button-glow inline-flex min-h-[40px] items-center gap-1 rounded-full px-4 py-1.5 text-white text-xs font-extrabold uppercase tracking-wider transition-transform hover:scale-105 active:scale-95"
-          style={{ background: 'linear-gradient(135deg, #a4ff8c 0%, #5cc6ff 100%)' }}
-        >
-          Share
-        </button>
+        <div className="flex items-center gap-2">
+          {/* AI tutor — opens a bottom sheet pinned to the current
+              demo + step. Same Sparkles vocabulary as the sandbox so
+              the affordance reads as "AI helper" across both surfaces. */}
+          <Sheet open={tutorOpen} onOpenChange={setTutorOpen}>
+            <SheetTrigger
+              render={
+                <button
+                  type="button"
+                  aria-label="Ask the chemistry tutor about this demo"
+                  className="button-glow inline-flex h-10 w-10 items-center justify-center rounded-full text-white shadow-[0_4px_20px_rgba(236,89,182,0.45)] transition-transform hover:scale-110 active:scale-95"
+                  style={{ background: 'linear-gradient(135deg, #ffd97a 0%, #ec59b6 100%)' }}
+                >
+                  <Sparkles className="h-4 w-4" />
+                </button>
+              }
+            />
+            <SheetContent
+              side="bottom"
+              style={{ height: '60vh', maxHeight: '60vh' }}
+              className="flex flex-col gap-0 overflow-hidden border-[#5cc6ff]/40 bg-[#0d0a22] p-0 text-[#dffaff]"
+            >
+              <SheetTitle className="shrink-0 border-[#2a2655] border-b px-4 py-3 font-extrabold text-[#dffaff] text-xs uppercase tracking-[0.25em]">
+                Tutor · {demo.title}
+              </SheetTitle>
+              <div className="min-h-0 flex-1">
+                <TutorPanel
+                  mode="demo"
+                  tier={levelToTier(level)}
+                  contextSummary={buildDemoContext(demo, step, level)}
+                  suggestions={TUTOR_SUGGESTIONS[step]}
+                />
+              </div>
+            </SheetContent>
+          </Sheet>
+          <button
+            type="button"
+            onClick={share}
+            className="button-glow inline-flex min-h-[40px] items-center gap-1 rounded-full px-4 py-1.5 font-extrabold text-white text-xs uppercase tracking-wider transition-transform hover:scale-105 active:scale-95"
+            style={{ background: 'linear-gradient(135deg, #a4ff8c 0%, #5cc6ff 100%)' }}
+          >
+            Share
+          </button>
+        </div>
       </header>
 
       {/* Bottom: step bubble + Prev/Next nav. */}
@@ -345,7 +545,8 @@ export function DemoPlayer({ demo, initialLevel }: DemoPlayerProps) {
                 className="text-[10px] font-extrabold uppercase tracking-[0.25em]"
                 style={{ color: typeColor }}
               >
-                Step {stepIndex + 1} · {STEP_LABEL[step]}
+                Step {stepIndex + 1} ·{' '}
+                {step === 'combine' ? ACTION_VERB[demo.effectKind] : STEP_LABEL[step]}
               </span>
               <span className="text-[10px] text-[#6a6f95] uppercase tracking-wider">
                 {level === 'elementary' ? 'Elementary' : 'Advanced'}
@@ -401,7 +602,7 @@ export function DemoPlayer({ demo, initialLevel }: DemoPlayerProps) {
           >
             {step === 'ingredients' ? (
               <>
-                Combine <ArrowRight className="h-4 w-4" strokeWidth={2.5} />
+                {ACTION_VERB[demo.effectKind]} <ArrowRight className="h-4 w-4" strokeWidth={2.5} />
               </>
             ) : step === 'combine' ? (
               <>
@@ -501,7 +702,15 @@ function CameraAutoFit({
     const vFov = (camera.fov * Math.PI) / 180
     const halfTanV = Math.tan(vFov / 2)
     const limitingTan = halfTanV * Math.min(1, aspect)
-    const target = (radius / limitingTan) * FIT_PADDING
+    // FIT_PADDING < 1 deliberately overshoots the bounding sphere on
+    // wide viewports — outer atoms "graze the edge" with orbit
+    // rotation, which reads as well-framed. But on narrow portrait
+    // viewports the graze becomes a hard clip (the edge atoms in a
+    // 3-4 atom row land off-screen). Force >= 1.0 padding when the
+    // viewport is portrait so everything actually fits, with a small
+    // margin (1.05) so the corner atoms aren't pixel-flush.
+    const padding = aspect < 1 ? Math.max(FIT_PADDING, 1.05) : FIT_PADDING
+    const target = (radius / limitingTan) * padding
     targetDistance.current = target
 
     // First fit: snap immediately so step 1 is framed correctly the

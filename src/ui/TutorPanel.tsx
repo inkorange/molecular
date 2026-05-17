@@ -1,7 +1,6 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { sceneToPrompt } from '@/src/lib/sceneToPrompt'
 import { useStore } from '@/src/store'
@@ -18,25 +17,62 @@ const SUGGESTIONS: Record<string, string[]> = {
     'What atom should I add next for water?',
   ],
   lab: ['What just happened?', 'Why did this release energy?', 'What else could I try?'],
+  demo: [
+    'Why does this reaction work?',
+    'What real-world use does this have?',
+    'Where does the energy come from?',
+  ],
+}
+
+type TutorMode = 'explore' | 'build' | 'lab' | 'demo'
+type TutorTier = 'beginner' | 'standard' | 'advanced'
+
+interface TutorPanelProps {
+  /** Override the context summary sent as `sceneSummary` to the API.
+   *  Used by the /demo player where the "scene" is a curated
+   *  demonstration (title + reaction + current step) rather than an
+   *  ad-hoc scene from the sandbox. When omitted, the panel falls
+   *  back to deriving a summary from the store. */
+  contextSummary?: string
+  /** Override the mode tag sent to the API. Demo player sends 'demo'. */
+  mode?: TutorMode
+  /** Override the tier sent to the API. Demo player maps its
+   *  `elementary | advanced` audience setting to beginner | advanced. */
+  tier?: TutorTier
+  /** Override the suggestion chips. When omitted, falls back to the
+   *  mode-keyed defaults in SUGGESTIONS above. */
+  suggestions?: readonly string[]
 }
 
 /**
- * Streaming tutor chat. Sends the current scene summary + mode/tier/question
- * to `/api/tutor`, then reads chunks off the response body and grows the
+ * Streaming tutor chat. Sends a context summary + mode/tier/question to
+ * `/api/tutor`, then reads chunks off the response body and grows the
  * placeholder assistant message in place. Suggestion chips below the
- * messages switch with the current mode so prompts feel relevant.
+ * messages adapt to the mode (or to an explicit `suggestions` prop)
+ * so prompts feel relevant.
+ *
+ * Props are all OPTIONAL — when omitted, the panel derives everything
+ * from the global store (sandbox flow). Demo pages override every prop
+ * because they don't share the sandbox store's `scene.mode/tier`.
  */
-export function TutorPanel() {
+export function TutorPanel({ contextSummary, mode, tier, suggestions }: TutorPanelProps = {}) {
   const messages = useStore((s) => s.tutor.messages)
   const streaming = useStore((s) => s.tutor.streaming)
-  const tier = useStore((s) => s.scene.tier)
-  const mode = useStore((s) => s.scene.mode)
+  const storeTier = useStore((s) => s.scene.tier)
+  const storeMode = useStore((s) => s.scene.mode)
   const addTutorMessage = useStore((s) => s.addTutorMessage)
   const appendToLast = useStore((s) => s.appendToLast)
   const setStreaming = useStore((s) => s.setStreaming)
   const clearTutor = useStore((s) => s.clearTutor)
   const [question, setQuestion] = useState('')
   const messagesRef = useRef<HTMLDivElement>(null)
+
+  // Resolved values — prop wins over store. Lets the same component
+  // serve both the sandbox (store-driven) and the demo player (prop-driven).
+  const effectiveMode: TutorMode = mode ?? storeMode
+  const effectiveTier: TutorTier = tier ?? storeTier
+  const effectiveSuggestions: readonly string[] =
+    suggestions ?? SUGGESTIONS[effectiveMode] ?? SUGGESTIONS.explore ?? []
 
   // Auto-scroll the message list to the bottom on every update — keeps the
   // currently-streaming token visible without the user chasing it. We
@@ -57,12 +93,19 @@ export function TutorPanel() {
     setStreaming(true)
     setQuestion('')
 
-    const sceneSummary = sceneToPrompt(useStore.getState().scene)
+    // Caller-provided context (demo player) takes precedence; otherwise
+    // derive from the sandbox store.
+    const sceneSummary = contextSummary ?? sceneToPrompt(useStore.getState().scene)
     try {
       const res = await fetch('/api/tutor', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ sceneSummary, tier, mode, question: q }),
+        body: JSON.stringify({
+          sceneSummary,
+          tier: effectiveTier,
+          mode: effectiveMode,
+          question: q,
+        }),
       })
       if (res.status === 429) {
         const retry = res.headers.get('retry-after')
@@ -112,7 +155,7 @@ export function TutorPanel() {
       </div>
       <div className="border-[#2a2655] border-t p-3">
         <div className="mb-2 flex flex-wrap gap-1">
-          {(SUGGESTIONS[mode] ?? []).map((s) => (
+          {effectiveSuggestions.map((s) => (
             <button
               key={s}
               type="button"
@@ -141,21 +184,28 @@ export function TutorPanel() {
           }}
           className="flex gap-2"
         >
+          {/* Input matches the rest of the app's pill vocabulary —
+              rounded-full, min-h-[40px], same height as the submit
+              button so they sit on a single visual baseline. */}
           <Input
             value={question}
             onChange={(e) => setQuestion(e.target.value)}
             placeholder="Ask the tutor…"
             disabled={streaming}
-            className="border-[#2a2655] bg-[#14112e] text-[#dffaff] placeholder:text-[#6a6f95]"
+            className="h-10 min-h-[40px] flex-1 rounded-full border-[#2a2655] bg-[#14112e] px-4 text-[#dffaff] placeholder:text-[#6a6f95]"
           />
-          <Button
+          {/* Submit — same gradient pill the global header CTAs use
+              ("Open the lab", etc.) so the action reads as primary. */}
+          <button
             type="submit"
             disabled={streaming || !question.trim()}
-            size="sm"
-            className="min-h-[40px] bg-[#5cc6ff] font-bold text-[#07051a] hover:bg-[#80d4ff]"
+            className="button-glow inline-flex min-h-[40px] items-center justify-center rounded-full px-5 py-1.5 font-extrabold text-white text-xs uppercase tracking-wider transition-transform hover:scale-105 active:scale-95 disabled:opacity-30 disabled:hover:scale-100"
+            style={{
+              background: 'linear-gradient(90deg, #5cc6ff 0%, #ec59b6 50%, #ffd97a 100%)',
+            }}
           >
             Ask
-          </Button>
+          </button>
         </form>
       </div>
     </div>

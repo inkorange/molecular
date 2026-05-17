@@ -23,12 +23,20 @@ interface TransitionFlashProps {
 
 // Color per reaction kind — same vocabulary as ReactionEffect so the flash
 // reads as the same "energy event" rather than a separate VFX layer.
+// Nuclear kinds (fusion / fission) get their own palette: fusion reads as
+// hot blue-white plasma; fission as an orange-red detonation glow.
 const FLASH_COLOR: Record<Demonstration['effectKind'], string> = {
   synthesis: '#dffaff',
   combustion: '#ffd97a',
   decomposition: '#c89eff',
   neutralization: '#a4ff8c',
   displacement: '#ffd97a',
+  fusion: '#dffaff',
+  fission: '#ff7a3a',
+  // Decay flash — soft radioactive-green so it reads distinct from
+  // the brighter fusion/fission events, matching the gentler nature
+  // of spontaneous alpha emission.
+  decay: '#a4ff8c',
 }
 
 // Where in (0..1) the flash peaks. Slightly before the visual midpoint so

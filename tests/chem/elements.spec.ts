@@ -63,8 +63,20 @@ describe('ELEMENTS table', () => {
     expect(Math.abs(na.electronegativity - cl.electronegativity)).toBeGreaterThan(1.7)
   })
 
-  it('getElement throws on Z out of range', () => {
+  it('getElement throws for invalid atomic numbers', () => {
+    // Z=0 and Z>118 don't exist as elements at all.
     expect(() => getElement(0)).toThrow()
-    expect(() => getElement(37)).toThrow()
+    expect(() => getElement(150)).toThrow()
+  })
+
+  it('getElement falls back to the periodic-table dataset for Z 37–118', () => {
+    // Z=37 is rubidium — outside the chem-engine's curated 1-36 range
+    // but still a valid element. Fallback returns a render-shaped Element
+    // with zeroed reaction fields so the chemistry engine itself never
+    // simulates it.
+    const rb = getElement(37)
+    expect(rb.symbol).toBe('Rb')
+    expect(rb.shells.length).toBeGreaterThan(0)
+    expect(rb.bondingCapacity).toBe(0)
   })
 })

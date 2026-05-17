@@ -1,4 +1,5 @@
-import type { Element } from './types'
+import { getPeriodicElement, type PeriodicCategory } from '@/src/data/elementsFull'
+import type { Element, ElementCategory } from './types'
 
 // CPK colors from the standard Corey-Pauling-Koltun palette.
 // Electronegativities are Pauling scale.
@@ -514,10 +515,69 @@ export const ELEMENTS: readonly Element[] = [
 const BY_Z = new Map<number, Element>(ELEMENTS.map((e) => [e.Z, e]))
 const BY_SYMBOL = new Map<string, Element>(ELEMENTS.map((e) => [e.symbol, e]))
 
+// Fallback CPK-ish colors by category, used when an element isn't in
+// the curated chemistry-engine list above (Z > 36) but still needs to
+// render in scenes — e.g. uranium / barium / krypton in the nuclear
+// demos. Real CPK has element-specific colors; carrying that data for
+// all 118 elements would bloat the bundle, so we approximate with the
+// same family-coded palette the periodic-table grid uses.
+const FALLBACK_CPK_BY_CATEGORY: Record<PeriodicCategory, string> = {
+  alkali: '#AB5CF2',
+  alkaline: '#8AFF00',
+  transition: '#FFC0CB',
+  'post-transition': '#B0B5CC',
+  'other-metal': '#B0B5CC',
+  metalloid: '#7AD9AA',
+  nonmetal: '#5CC6FF',
+  halogen: '#C8FF7A',
+  noble: '#C89EFF',
+  lanthanide: '#FFC8C8',
+  actinide: '#FF8888',
+}
+
+// Map the wider periodic-table category enum back to the chemistry
+// engine's narrower one. Lanthanides + actinides collapse to
+// 'transition' (their d-/f-block character is closest to that bucket);
+// 'post-transition' collapses to 'other-metal'.
+function narrowCategory(p: PeriodicCategory): ElementCategory {
+  switch (p) {
+    case 'lanthanide':
+    case 'actinide':
+      return 'transition'
+    case 'post-transition':
+      return 'other-metal'
+    default:
+      return p
+  }
+}
+
 export function getElement(Z: number): Element {
   const el = BY_Z.get(Z)
-  if (!el) throw new Error(`No element with Z=${Z} (supported range: 1–36)`)
-  return el
+  if (el) return el
+  // Fall back to the full periodic-table dataset for elements outside
+  // the chemistry-engine's modelled range. The fallback Element is for
+  // RENDERING only — its valence / bondingCapacity / oxidation states
+  // are zeroed because the reaction engine doesn't simulate Z > 36.
+  // Scenes that just need an atom (demo player, sandbox spawns) still
+  // get a correctly-shaped atom with shells + a sensible color.
+  const periodic = getPeriodicElement(Z)
+  if (periodic) {
+    return {
+      Z: periodic.Z,
+      symbol: periodic.symbol,
+      name: periodic.name,
+      mass: periodic.mass,
+      category: narrowCategory(periodic.category),
+      cpkColor: FALLBACK_CPK_BY_CATEGORY[periodic.category] ?? '#9aa0c8',
+      shells: [...periodic.shells],
+      valence: 0,
+      bondingCapacity: 0,
+      oxidationStates: [0],
+      electronegativity: 0,
+      vdwRadius: 1.5,
+    }
+  }
+  throw new Error(`No element with Z=${Z}`)
 }
 
 export function getElementBySymbol(symbol: string): Element {
