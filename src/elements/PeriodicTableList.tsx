@@ -2,7 +2,10 @@
 
 import { useMemo } from 'react'
 import { PERIODIC_ELEMENTS } from '@/src/data/elementsFull'
+import { getElementTrends } from '@/src/data/elementTrends'
+import { categoryAccent } from './categoryColors'
 import { PeriodicTile } from './PeriodicTile'
+import { type ElementViewMode, tileAccentForView } from './trendOverlay'
 
 interface PeriodicTableListProps {
   selectedSlug: string | null
@@ -10,6 +13,8 @@ interface PeriodicTableListProps {
   registerRef?: (slug: string, el: HTMLButtonElement | null) => void
   /** Apply a dim/blur treatment while the detail overlay is shown. */
   dimmed?: boolean
+  /** Coloring mode — 'categories' (default) or one of the trend keys. */
+  view?: ElementViewMode
 }
 
 const PERIOD_LABELS: Record<number, string> = {
@@ -33,6 +38,7 @@ export function PeriodicTableList({
   onSelect,
   registerRef,
   dimmed,
+  view = 'categories',
 }: PeriodicTableListProps) {
   const grouped = useMemo(() => {
     const buckets = new Map<number, (typeof PERIODIC_ELEMENTS)[number][]>()
@@ -60,16 +66,33 @@ export function PeriodicTableList({
             {PERIOD_LABELS[period] ?? `Period ${period}`}
           </h3>
           <div className="grid grid-cols-6 gap-1.5 sm:grid-cols-8">
-            {entries.map((el) => (
-              <PeriodicTile
-                key={el.slug}
-                element={el}
-                positioned={false}
-                onSelect={onSelect}
-                registerRef={registerRef}
-                hidden={selectedSlug === el.slug}
-              />
-            ))}
+            {entries.map((el) => {
+              const categoryFallback = categoryAccent(el.category)
+              const accent =
+                view === 'categories'
+                  ? categoryFallback
+                  : tileAccentForView(el.Z, view, categoryFallback)
+              const trendNumeric =
+                view === 'categories' ? null : (getElementTrends(el.Z)[view] ?? null)
+              return (
+                <PeriodicTile
+                  key={el.slug}
+                  element={el}
+                  positioned={false}
+                  onSelect={onSelect}
+                  registerRef={registerRef}
+                  hidden={selectedSlug === el.slug}
+                  accentOverride={view === 'categories' ? undefined : accent}
+                  trendValue={
+                    trendNumeric != null
+                      ? view === 'electronegativity'
+                        ? trendNumeric.toFixed(2)
+                        : String(Math.round(trendNumeric))
+                      : undefined
+                  }
+                />
+              )
+            })}
           </div>
         </section>
       ))}
