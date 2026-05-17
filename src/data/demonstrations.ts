@@ -103,11 +103,20 @@ export interface Demonstration {
    */
   freeParticles?: FreeParticle[]
   /**
-   * Magnitude of energy released, on a relative 0–5 scale. Drives the
-   * brightness + quanta count of the energy halo in the Results step.
-   * Omit (or set to 0) for endothermic / near-thermoneutral reactions.
+   * Magnitude of energy on a relative 0–5 scale. Drives the brightness
+   * + size of the energy blob in the Results step. Always positive —
+   * the *direction* (released vs absorbed) is in `energyDirection`.
+   * Omit (or set to 0) when the reaction is genuinely thermoneutral
+   * and shouldn't get a blob at all.
    */
   energyScale?: EnergyScale
+  /**
+   * Whether the reaction RELEASES energy (exothermic — flames lick
+   * outward from the blob) or ABSORBS it (endothermic — particles
+   * stream inward, getting consumed). Defaults to 'released' when
+   * omitted, since most chemistry demos are exothermic.
+   */
+  energyDirection?: 'released' | 'absorbed'
   /**
    * Optional human-readable energy magnitude shown as floating 3D text
    * in the Results step (e.g. "17.6 MeV", "−572 kJ/mol", "+57 kJ/mol").
@@ -277,6 +286,9 @@ export const DEMOS: Demonstration[] = [
     effectKind: 'decomposition',
     energySource: 'electricity',
     ingredients: [{ kind: 'library', libraryId: 'water', count: 2 }],
+    energyScale: 3,
+    energyDirection: 'absorbed',
+    energyLabel: '+572 kJ/mol',
     steps: {
       ingredients: {
         elementary:
@@ -576,6 +588,9 @@ export const DEMOS: Demonstration[] = [
     difficulty: 3,
     effectKind: 'decomposition',
     ingredients: [{ kind: 'library', libraryId: 'ammonia', count: 2 }],
+    energyScale: 2,
+    energyDirection: 'absorbed',
+    energyLabel: '+92 kJ/mol',
     steps: {
       ingredients: {
         elementary:
