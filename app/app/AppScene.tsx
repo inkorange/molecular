@@ -26,22 +26,44 @@ export function AppScene() {
   const addAtom = useStore((s) => s.addAtom)
   const addBond = useStore((s) => s.addBond)
   const addMolecule = useStore((s) => s.addMolecule)
+  const resetScene = useStore((s) => s.resetScene)
 
-  // First-mount spawn. Honours `?molecule=<libId>` from a landing deep link
-  // so visitors who tap a feature card or the reel CTA land in the app
-  // already looking at the molecule they clicked. Falls back to water when
-  // the param is missing or the lib id isn't recognised.
+  // First-mount spawn.
+  //
+  // When `?molecule=<libId>` is in the URL we ALWAYS honour it — reset
+  // the existing scene first then spawn the requested entry. The
+  // previous behaviour gated on `atoms.length === 0`, but the zustand
+  // store survives across route navigations (it's a module-level
+  // singleton), so the second time the user arrived from an element
+  // detail with a different molecule param the scene still held the
+  // PREVIOUS molecule's atoms — the check returned early and the new
+  // param was ignored. The user saw whatever they last opened
+  // regardless of the link they clicked.
+  //
+  // When the URL has NO molecule param, only spawn water as a default
+  // when the scene is genuinely empty. Otherwise we'd clobber a
+  // user-built scene on every render.
   useEffect(() => {
-    if (Object.keys(useStore.getState().scene.atoms).length > 0) return
     const params = new URLSearchParams(window.location.search)
-    const lib = params.get('molecule') ?? 'water'
-    const entry = getLibraryEntry(lib) ?? getLibraryEntry('water')
+    const lib = params.get('molecule')
+    if (lib) {
+      const entry = getLibraryEntry(lib) ?? getLibraryEntry('water')
+      if (!entry) return
+      resetScene()
+      const result = spawnLibraryEntry(entry)
+      addMolecule(result.molecule)
+      for (const a of result.atoms) addAtom(a)
+      for (const b of result.bonds) addBond(b)
+      return
+    }
+    if (Object.keys(useStore.getState().scene.atoms).length > 0) return
+    const entry = getLibraryEntry('water')
     if (!entry) return
     const result = spawnLibraryEntry(entry)
     addMolecule(result.molecule)
     for (const a of result.atoms) addAtom(a)
     for (const b of result.bonds) addBond(b)
-  }, [addAtom, addBond, addMolecule])
+  }, [addAtom, addBond, addMolecule, resetScene])
 
   // Auto-save the scene to localStorage one second after the last change.
   // Debounced so rapid edits (drag, build, react) don't hammer setItem.

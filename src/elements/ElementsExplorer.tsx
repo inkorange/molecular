@@ -111,8 +111,13 @@ export function ElementsExplorer({ initialSlug }: ElementsExplorerProps) {
     else tileRefs.current.delete(slug)
   }, [])
 
-  // Browser back/forward — re-derive selection without re-running the
-  // morph. The user is mid-navigation; they expect an instant snap.
+  // URL ↔ state sync. Runs on initial mount AND on every browser
+  // back/forward (popstate). The mount-time call is the defensive
+  // safety net: Next.js soft navigation + the browser's bf-cache can
+  // leave the React tree mounted with stale state when the user comes
+  // back from an external route — without this, we'd see the URL
+  // reading /elements/hydrogen but the page rendering the grid (no
+  // detail) because state was selection=null from before.
   useEffect(() => {
     function syncFromUrl() {
       const m = window.location.pathname.match(/^\/elements\/([^/]+)/)
@@ -129,8 +134,16 @@ export function ElementsExplorer({ initialSlug }: ElementsExplorerProps) {
         setMorph(null)
       }
     }
+    syncFromUrl()
     window.addEventListener('popstate', syncFromUrl)
-    return () => window.removeEventListener('popstate', syncFromUrl)
+    // pageshow fires when the page is restored from the browser
+    // back-forward cache (BFC). When that happens, popstate doesn't —
+    // pageshow is the right hook to re-sync.
+    window.addEventListener('pageshow', syncFromUrl)
+    return () => {
+      window.removeEventListener('popstate', syncFromUrl)
+      window.removeEventListener('pageshow', syncFromUrl)
+    }
   }, [])
 
   const handleSelect = useCallback(
