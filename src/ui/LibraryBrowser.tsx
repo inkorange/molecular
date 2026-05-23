@@ -14,6 +14,14 @@ export function LibraryBrowser({ onPick }: { onPick?: () => void }) {
   const addMolecule = useStore((s) => s.addMolecule)
   const resetScene = useStore((s) => s.resetScene)
   const setLastAddedLibId = useStore((s) => s.setLastAddedLibId)
+  // Lab-slice clears. Picking a new base molecule is conceptually a
+  // fresh start, so any reactant pool / dismissed hints / in-flight
+  // animation from the previous base needs to go too. Without this,
+  // hint cards still showed the previous reactant as "added" because
+  // their reactant pool persisted across the scene reset.
+  const clearPendingReactants = useStore((s) => s.clearPendingReactants)
+  const clearDismissedHints = useStore((s) => s.clearDismissedHints)
+  const clearReactionAnimation = useStore((s) => s.clearReactionAnimation)
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase()
@@ -42,7 +50,16 @@ export function LibraryBrowser({ onPick }: { onPick?: () => void }) {
   function pick(id: string) {
     const entry = LIBRARY.find((m) => m.id === id)
     if (!entry) return
+    // Full reset: scene atoms/bonds/molecules AND the lab slice's
+    // user-state (pending reactants, dismissed hints, in-flight
+    // animation). Hint cards derive their "+ Add X" vs "✓ added" rows
+    // from the scene plus this lab state — without clearing the lab
+    // state, the user would switch base molecules and still see leftover
+    // chips marked as added.
     resetScene()
+    clearPendingReactants()
+    clearDismissedHints()
+    clearReactionAnimation()
     const result = spawnLibraryEntry(entry)
     addMolecule(result.molecule)
     for (const a of result.atoms) addAtom(a)
