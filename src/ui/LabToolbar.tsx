@@ -12,6 +12,13 @@ import { useStore } from '@/src/store'
 import { ReactionLog } from './ReactionLog'
 import { RecipeHintPanel } from './RecipeHintPanel'
 
+// Lab-mode reaction-animation duration. Slightly shorter than the
+// /demo player's 1400ms because the lab flow is more emergent — the
+// user already sees the molecule consumption in real time via
+// applyReaction, so the effect overlay only needs to punctuate that
+// rather than narrate the whole transition.
+const LAB_ANIMATION_MS = 1100
+
 // Curated reactant palette. Library IDs that appear as reactants in
 // src/chem/reactions.ts and have decent visual / interaction value in Lab.
 // H₂ and O₂ stay as quick-access buttons; everything else lives behind the
@@ -45,6 +52,10 @@ export function LabToolbar() {
   const clearReactionLog = useStore((s) => s.clearReactionLog)
   const addPendingReactant = useStore((s) => s.addPendingReactant)
   const clearPendingReactants = useStore((s) => s.clearPendingReactants)
+  const removeMolecule = useStore((s) => s.removeMolecule)
+  const startReactionAnimation = useStore((s) => s.startReactionAnimation)
+  const setReactionAnimationProducts = useStore((s) => s.setReactionAnimationProducts)
+  const clearReactionAnimation = useStore((s) => s.clearReactionAnimation)
   const dismissHint = useStore((s) => s.dismissHint)
   const clearDismissedHints = useStore((s) => s.clearDismissedHints)
   const dismissedHintIds = useStore((s) => s.lab.dismissedHintIds)
@@ -126,10 +137,48 @@ export function LabToolbar() {
   // ids directly to applyReaction rather than going through tryReact — this
   // avoids the situation where two recipes might be simultaneously satisfied
   // by the scene and the wrong one fires.
+  //
+  // Animation timeline:
+  //   t=0           — close hints sheet; start animation with reactantIds.
+  //                   LabMolecule shrinks the matched reactants toward the
+  //                   world origin during the first half.
+  //   t=midpoint    — under the cover of TransitionFlash's peak brightness,
+  //                   call applyReaction (which removes reactants from the
+  //                   store + adds products). Diff before/after to capture
+  //                   the new product ids and feed them into the animation
+  //                   state, so the LabMolecule for each product can play
+  //                   its grow-from-origin entry during the second half.
+  //   t=durationMs  — clear the animation so the visual returns to a
+  //                   normal physics-driven scene.
   function combineHint(hint: RecipeHint) {
     const reaction = REACTIONS.find((r) => r.id === hint.reactionId)
     if (!reaction || hint.matchedMoleculeIds.length === 0) return
-    applyReaction(reaction, hint.matchedMoleculeIds)
+    const kind = reaction.type as
+      | 'synthesis'
+      | 'combustion'
+      | 'decomposition'
+      | 'neutralization'
+      | 'displacement'
+    setHintsOpen(false)
+    startReactionAnimation({
+      reactionId: reaction.id,
+      kind,
+      enthalpy: reaction.enthalpy,
+      startedAt: performance.now(),
+      durationMs: LAB_ANIMATION_MS,
+      reactantIds: hint.matchedMoleculeIds,
+      productIds: [],
+    })
+    // Fire the reaction at the flash midpoint so the visual swap is
+    // hidden by the bright cover-up moment of TransitionFlash.
+    window.setTimeout(() => {
+      const before = new Set(Object.keys(useStore.getState().scene.molecules))
+      applyReaction(reaction, hint.matchedMoleculeIds)
+      const afterIds = Object.keys(useStore.getState().scene.molecules)
+      const productIds = afterIds.filter((id) => !before.has(id))
+      setReactionAnimationProducts(productIds)
+    }, LAB_ANIMATION_MS * 0.5)
+    window.setTimeout(() => clearReactionAnimation(), LAB_ANIMATION_MS)
   }
 
   return (
@@ -227,6 +276,7 @@ export function LabToolbar() {
                   // recipes the products enable will appear).
                 }}
                 onAddReactant={(libId) => add(libId)}
+                onUndoReactant={(moleculeId) => removeMolecule(moleculeId as never)}
                 onDismiss={dismissHint}
               />
             </div>

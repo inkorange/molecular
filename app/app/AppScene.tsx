@@ -12,6 +12,7 @@ import { CameraSync } from '@/src/scene/CameraSync'
 import { DragGhost } from '@/src/scene/DragGhost'
 import { DropCatcher } from '@/src/scene/DropCatcher'
 import { LabMolecule } from '@/src/scene/LabMolecule'
+import { LabReactionEffects } from '@/src/scene/LabReactionEffects'
 import { Molecule } from '@/src/scene/Molecule'
 import { PhysicsWrapper } from '@/src/scene/PhysicsWrapper'
 import { Scene } from '@/src/scene/Scene'
@@ -121,6 +122,10 @@ export function AppScene() {
       <DragGhost />
       <AttachPoints />
       <SelectionMenu />
+      {/* Reaction-animation overlay. Renders nothing while
+          `lab.activeAnimation` is null; lights up with the demo-style
+          particles + flash + energy blob when the user hits Combine. */}
+      {inLab && <LabReactionEffects />}
     </Scene>
   )
 }

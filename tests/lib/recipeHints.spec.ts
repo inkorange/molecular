@@ -34,7 +34,8 @@ describe('getRecipeHints', () => {
     const water = hints.find((h) => h.reactionId === 'water-synthesis')
     expect(water).toBeDefined()
     expect(water?.status).toBe('ready')
-    expect(water?.missing).toEqual([])
+    // Every reactant slot is fully satisfied — no unmet needs.
+    expect(water?.reactants.every((r) => r.satisfied === r.needed)).toBe(true)
     // Three molecules in the scene; all three should be in the matched set.
     expect(new Set(water?.matchedMoleculeIds)).toEqual(new Set(moleculeIds))
   })
@@ -45,7 +46,11 @@ describe('getRecipeHints', () => {
     const water = hints.find((h) => h.reactionId === 'water-synthesis')
     expect(water).toBeDefined()
     expect(water?.status).toBe('missing')
-    expect(water?.missing).toContainEqual({ formula: 'H2', count: 1 })
+    // H₂ slot needs 2 but only 1 is satisfied. O₂ slot is fully satisfied.
+    const h2Slot = water?.reactants.find((r) => r.formula === 'H2')
+    expect(h2Slot).toMatchObject({ needed: 2, satisfied: 1 })
+    const o2Slot = water?.reactants.find((r) => r.formula === 'O2')
+    expect(o2Slot).toMatchObject({ needed: 1, satisfied: 1 })
     expect(water?.matchedMoleculeIds).toEqual([])
   })
 

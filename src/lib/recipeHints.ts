@@ -2,6 +2,25 @@ import { getFormula } from '@/src/chem/formula'
 import { REACTIONS, type Reaction } from '@/src/chem/reactions'
 import type { Atom as AtomData, SceneSnapshot } from '@/src/chem/types'
 
+/**
+ * Per-reactant slot in a recipe. Shown as one row on the hint card.
+ * Built from the scene index so the user can see at a glance how
+ * many of each reactant they have vs need, AND undo individual
+ * additions instead of nuking the whole scene.
+ */
+export interface ReactantSlot {
+  formula: string
+  /** How many of this reactant the recipe needs (from REACTIONS). */
+  needed: number
+  /** How many the scene currently provides — clamped to `needed`. */
+  satisfied: number
+  /** Scene molecule ids that satisfy this slot. Length === satisfied.
+   *  Used by the panel's Undo affordance — clicking Undo removes the
+   *  LAST id in this list so the user can step back through their
+   *  additions one at a time. Empty when satisfied === 0. */
+  matchedIds: string[]
+}
+
 export interface RecipeHint {
   reactionId: string
   /** Human-readable balanced equation: "2 H2 + O2 → 2 H2O". */
@@ -9,11 +28,14 @@ export interface RecipeHint {
   /** Plain-English summary of the reaction's products and notes. */
   notes: string
   enthalpy: 'exothermic' | 'endothermic'
-  /** 'ready' means the scene already has enough reactants; 'missing' means
-   *  the user still needs to add more of something. */
+  /** 'ready' means every reactant slot is satisfied; 'missing' means
+   *  at least one slot still needs more. */
   status: 'ready' | 'missing'
-  /** What's still needed when status === 'missing'. Empty otherwise. */
-  missing: { formula: string; count: number }[]
+  /** Per-reactant breakdown — one entry per row in the hint card.
+   *  Always populated (even on ready hints), so the panel can render
+   *  the full reaction with ✓ markers and Undo buttons on each
+   *  individual reactant. */
+  reactants: ReactantSlot[]
   /** Scene molecule ids picked to satisfy this recipe (deterministic — the
    *  first N molecules of each formula). Lets the panel pass them straight
    *  to applyReaction without re-matching. Empty when missing. */
@@ -63,29 +85,36 @@ function buildHint(
   pending: Set<string>,
 ): RecipeHint {
   const matched: string[] = []
-  const missing: { formula: string; count: number }[] = []
+  const reactants: ReactantSlot[] = []
   let neededTotal = 0
-  let satisfied = 0
+  let satisfiedTotal = 0
   let allMatchedPending = true
+  let anyMissing = false
 
   for (const r of reaction.reactants) {
     neededTotal += r.count
     const available = byFormula.get(r.formula) ?? []
     const take = Math.min(available.length, r.count)
-    satisfied += take
+    satisfiedTotal += take
+    const slotIds: string[] = []
     for (let i = 0; i < take; i++) {
       const id = available[i]
       if (!id) continue
       matched.push(id)
+      slotIds.push(id)
       if (!pending.has(id)) allMatchedPending = false
     }
-    if (take < r.count) {
-      missing.push({ formula: r.formula, count: r.count - take })
-    }
+    if (take < r.count) anyMissing = true
+    reactants.push({
+      formula: r.formula,
+      needed: r.count,
+      satisfied: take,
+      matchedIds: slotIds,
+    })
   }
 
-  const status: RecipeHint['status'] = missing.length === 0 ? 'ready' : 'missing'
-  const fillRatio = neededTotal === 0 ? 0 : satisfied / neededTotal
+  const status: RecipeHint['status'] = anyMissing ? 'missing' : 'ready'
+  const fillRatio = neededTotal === 0 ? 0 : satisfiedTotal / neededTotal
   const eqL = formatEquation(reaction.reactants)
   const eqR = formatEquation(reaction.products)
 
@@ -95,7 +124,7 @@ function buildHint(
     notes: reaction.notes,
     enthalpy: reaction.enthalpy,
     status,
-    missing,
+    reactants,
     matchedMoleculeIds: status === 'ready' ? matched : [],
     // A "ready" hint where every matched molecule is in the pending pool
     // is the cleanest fit — bump its effective ratio above 1 so it sorts
